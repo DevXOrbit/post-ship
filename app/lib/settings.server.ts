@@ -1,12 +1,5 @@
 /**
- * app/lib/settings.server.ts
- *
- * Shared helper for reading and writing AppSettings.
- * Import this in routes and webhooks — never query AppSettings directly.
- *
- * Usage:
- *   const settings = await getSettings(shop);
- *   await upsertSettings(shop, { brandColor: "#ff0000" });
+ * app/lib/settings.server.ts  — updated with onboarding fields
  */
 import prisma from "../db.server";
 
@@ -25,6 +18,11 @@ export interface AppSettingsData {
   brandColor: string;
   cancellationWindowHours: number;
   whatsappNumber: string;
+  // ── Onboarding ───────────────────────────────────────────────────────────
+  onboardingStep1: boolean;
+  onboardingStep2: boolean;
+  onboardingStep3: boolean;
+  onboardingDone: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettingsData = {
@@ -42,12 +40,12 @@ export const DEFAULT_SETTINGS: AppSettingsData = {
   brandColor: "#5c6ac4",
   cancellationWindowHours: 2,
   whatsappNumber: "",
+  onboardingStep1: false,
+  onboardingStep2: false,
+  onboardingStep3: false,
+  onboardingDone: false,
 };
 
-/**
- * Load settings for a shop.
- * Returns defaults merged with stored values — never null.
- */
 export async function getSettings(shop: string): Promise<AppSettingsData> {
   const row = await prisma.appSettings
     .findUnique({ where: { shop } })
@@ -70,16 +68,16 @@ export async function getSettings(shop: string): Promise<AppSettingsData> {
     brandColor: row.brandColor,
     cancellationWindowHours: row.cancellationWindowHours,
     whatsappNumber: row.whatsappNumber,
+    onboardingStep1: row.onboardingStep1 ?? false,
+    onboardingStep2: row.onboardingStep2 ?? false,
+    onboardingStep3: row.onboardingStep3 ?? false,
+    onboardingDone: row.onboardingDone ?? false,
   };
 }
 
-/**
- * Create or update settings for a shop.
- * Pass only the fields you want to change.
- */
 export async function upsertSettings(
   shop: string,
-  data: Partial<AppSettingsData>
+  data: Partial<AppSettingsData>,
 ): Promise<void> {
   await prisma.appSettings.upsert({
     where: { shop },

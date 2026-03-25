@@ -1,471 +1,461 @@
-import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useNavigate } from "react-router";
+/**
+ * app/routes/app.onboarding.tsx
+ *
+ * PostShip — Onboarding Page
+ *
+ * Three setup steps the merchant must complete before using the app:
+ *   Step 1 — Enable the PostShip app embed in the Shopify Theme Editor
+ *   Step 2 — Create a "Track Your Order" page in the Shopify admin
+ *   Step 3 — Add the PostShip tracking widget block to that page
+ *
+ * Step completion is stored in AppSettings (onboardingStep1/2/3).
+ * Steps 2 and 3 are manually confirmed by the merchant (button click).
+ * Step 1 is also manually confirmed — there's no API to detect theme embeds.
+ *
+ * Once all 3 steps are done → onboardingDone = true → redirect to /app.
+ *
+ * The page is also accessible at any time from the nav ("Setup Guide").
+ */
+import type {
+  ActionFunctionArgs,
+  HeadersFunction,
+  LoaderFunctionArgs,
+} from "react-router";
+import { redirect, useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
-import { boundary } from "@shopify/shopify-app-react-router/server";
+import { getSettings, upsertSettings } from "../lib/settings.server";
 
-interface Order {
-  id: string;
-  name: string;
-  createdAt: string;
-  displayFulfillmentStatus: string;
-  displayFinancialStatus: string;
-  totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
-  lineItems: { edges: Array<{ node: { title: string; quantity: number } }> };
-  fulfillments: Array<{
-    trackingInfo: Array<{ number: string; url: string }>;
-    status: string;
-  }>;
-}
-
-interface LoaderData {
-  orders: Order[];
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  endCursor: string | null;
-  startCursor: string | null;
-  stats: {
-    total: number;
-    fulfilled: number;
-    unfulfilled: number;
-    inTransit: number;
-  };
-  statusFilter: string;
-  error: string | null;
-  needsAccess: boolean;
-}
-
+// ── Loader ─────────────────────────────────────────────────────────────────
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
 
-  const url = new URL(request.url);
-  const cursor = url.searchParams.get("cursor");
-  const direction = url.searchParams.get("direction") || "next";
-  const statusFilter = url.searchParams.get("status") || "any";
+  // Check onboarding state from DB
+  const row = await import("../db.server").then((m) =>
+    m.default.appSettings.findUnique({ where: { shop } }),
+  );
 
-  const paginationArgs =
-    direction === "prev" && cursor
-      ? `last: 20, before: "${cursor}"`
-      : cursor
-        ? `first: 20, after: "${cursor}"`
-        : "first: 20";
+  const steps = {
+    step1: row?.onboardingStep1 ?? false,
+    step2: row?.onboardingStep2 ?? false,
+    step3: row?.onboardingStep3 ?? false,
+    done: row?.onboardingDone ?? false,
+  };
 
-  const queryFilter =
-    statusFilter !== "any"
-      ? `, query: "fulfillment_status:${statusFilter}"`
-      : "";
+  // Already completed — send to main app
+  if (steps.done) throw redirect("/app");
 
-  try {
-    const response = await admin.graphql(`
-      #graphql
-      query getOrders {
-        orders(${paginationArgs}${queryFilter}, sortKey: CREATED_AT, reverse: true) {
-          pageInfo {
-            hasNextPage
-            hasPreviousPage
-            startCursor
-            endCursor
-          }
-          edges {
-            node {
-              id
-              name
-              createdAt
-              displayFulfillmentStatus
-              displayFinancialStatus
-              totalPriceSet {
-                shopMoney { amount currencyCode }
-              }
-              lineItems(first: 3) {
-                edges {
-                  node { title quantity }
-                }
-              }
-              fulfillments(first: 1) {
-                status
-                trackingInfo { number url }
-              }
-            }
-          }
-        }
-      }
-    `);
+  // Build the theme editor deep-link for the app embed
+  const apiKey = process.env.SHOPIFY_API_KEY ?? "";
+  const themeEditorUrl = `https://${shop}/admin/themes/current/editor?context=apps&appEmbed=${apiKey}`;
 
-    const json = await response.json();
+  // Shopify admin new page link
+  const newPageUrl = `https://${shop}/admin/pages/new`;
 
-    if (json.errors?.length) {
-      const msg = json.errors[0]?.message ?? "GraphQL error";
-      const isAccessError =
-        msg.toLowerCase().includes("not approved") ||
-        msg.toLowerCase().includes("protected") ||
-        msg.toLowerCase().includes("order object");
-      return {
-        orders: [],
-        hasNextPage: false,
-        hasPreviousPage: false,
-        endCursor: null,
-        startCursor: null,
-        stats: { total: 0, fulfilled: 0, unfulfilled: 0, inTransit: 0 },
-        statusFilter,
-        error: msg,
-        needsAccess: isAccessError,
-      };
+  // Fetch shop name for greeting
+  const shopRes = await admin.graphql(`#graphql
+  query ShopShow {
+    shop {
+      name   
     }
+  }`);
+  const shopJson = await shopRes.json();
+  const shopName = shopJson.data?.shop?.name ?? "your store";
 
-    const ordersData = json.data?.orders;
-    const orders: Order[] =
-      ordersData?.edges?.map((e: { node: Order }) => e.node) ?? [];
-    const pageInfo = ordersData?.pageInfo ?? {};
-
-    return {
-      orders,
-      hasNextPage: pageInfo.hasNextPage ?? false,
-      hasPreviousPage: pageInfo.hasPreviousPage ?? false,
-      endCursor: pageInfo.endCursor ?? null,
-      startCursor: pageInfo.startCursor ?? null,
-      stats: {
-        total: orders.length,
-        fulfilled: orders.filter(
-          (o) => o.displayFulfillmentStatus === "FULFILLED",
-        ).length,
-        unfulfilled: orders.filter(
-          (o) => o.displayFulfillmentStatus === "UNFULFILLED",
-        ).length,
-        inTransit: orders.filter(
-          (o) =>
-            o.displayFulfillmentStatus === "IN_TRANSIT" ||
-            o.displayFulfillmentStatus === "PARTIALLY_FULFILLED",
-        ).length,
-      },
-      statusFilter,
-      error: null,
-      needsAccess: false,
-    };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    const isAccessError =
-      msg.toLowerCase().includes("not approved") ||
-      msg.toLowerCase().includes("protected") ||
-      msg.toLowerCase().includes("order object");
-    return {
-      orders: [],
-      hasNextPage: false,
-      hasPreviousPage: false,
-      endCursor: null,
-      startCursor: null,
-      stats: { total: 0, fulfilled: 0, unfulfilled: 0, inTransit: 0 },
-      statusFilter,
-      error: msg,
-      needsAccess: isAccessError,
-    };
-  }
+  return { steps, themeEditorUrl, newPageUrl, shopName, shop };
 };
 
-function getFulfillmentTone(
-  status: string,
-): "success" | "warning" | "info" | "critical" | "new" | undefined {
-  const map: Record<
-    string,
-    "success" | "warning" | "info" | "critical" | "new"
-  > = {
-    FULFILLED: "success",
-    UNFULFILLED: "warning",
-    PARTIALLY_FULFILLED: "info",
-    IN_TRANSIT: "info",
-    OUT_FOR_DELIVERY: "info",
-    DELIVERED: "success",
-    FAILED: "critical",
-    CANCELLED: "critical",
-    ON_HOLD: "new",
+// ── Action ─────────────────────────────────────────────────────────────────
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+
+  if (intent === "complete-step") {
+    const step = formData.get("step") as string;
+    const update: Record<string, boolean> = {};
+
+    if (step === "1") update.onboardingStep1 = true;
+    if (step === "2") update.onboardingStep2 = true;
+    if (step === "3") update.onboardingStep3 = true;
+
+    await upsertSettings(shop, update as Parameters<typeof upsertSettings>[1]);
+
+    // Check if all 3 are now done
+    const row = await import("../db.server").then((m) =>
+      m.default.appSettings.findUnique({ where: { shop } }),
+    );
+
+    const allDone =
+      (row?.onboardingStep1 || update.onboardingStep1) &&
+      (row?.onboardingStep2 || update.onboardingStep2) &&
+      (row?.onboardingStep3 || update.onboardingStep3);
+
+    if (allDone) {
+      await upsertSettings(shop, { onboardingDone: true } as Parameters<
+        typeof upsertSettings
+      >[1]);
+      throw redirect("/app");
+    }
+
+    return { success: true };
+  }
+
+  // "skip" — mark as done and go to app
+  if (intent === "skip") {
+    await upsertSettings(shop, { onboardingDone: true } as Parameters<
+      typeof upsertSettings
+    >[1]);
+    throw redirect("/app");
+  }
+
+  return { success: false };
+};
+
+// ── Component ──────────────────────────────────────────────────────────────
+export default function Index() {
+  const { steps, themeEditorUrl, newPageUrl, shopName } = useLoaderData<
+    typeof loader
+  >() as {
+    steps: { step1: boolean; step2: boolean; step3: boolean; done: boolean };
+    themeEditorUrl: string;
+    newPageUrl: string;
+    shopName: string;
   };
-  return map[status];
-}
 
-function formatStatus(s: string): string {
-  return s
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (l) => l.toUpperCase());
-}
+  const fetcher = useFetcher<{ success: boolean }>();
 
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+  const completeStep = (step: string) => {
+    fetcher.submit({ intent: "complete-step", step }, { method: "post" });
+  };
 
-export default function Dashboard() {
-  const data = useLoaderData<typeof loader>() as LoaderData;
-  const navigate = useNavigate();
-  const {
-    orders,
-    hasNextPage,
-    hasPreviousPage,
-    stats,
-    statusFilter,
-    error,
-    needsAccess,
-  } = data;
+  const completedCount = [steps.step1, steps.step2, steps.step3].filter(
+    Boolean,
+  ).length;
+  const allDone = completedCount === 3;
 
   return (
-    <s-page heading="PostShip — Order Tracking">
-      <s-button
-        slot="primary-action"
-        icon="refresh"
-        onClick={() => navigate("/app")}
-      >
-        Refresh
-      </s-button>
-
-      {/* ── Protected data access guide ── */}
-      {needsAccess && (
-        <s-banner tone="critical">
-          <s-stack direction="block" gap="base">
-            <s-text type="strong">
-              Protected Customer Data Access Required
-            </s-text>
-            <s-paragraph>
-              Your app needs approval in the Shopify Partner Dashboard to access
-              the Orders API. This is required even for development stores.
-            </s-paragraph>
-            <s-ordered-list>
-              <s-list-item>
-                Open your{" "}
-                <s-link
-                  href="https://partners.shopify.com/current/apps"
-                  target="_blank"
-                >
-                  Shopify Partner Dashboard
-                </s-link>{" "}
-                → select your app
-              </s-list-item>
-              <s-list-item>
-                Click <s-text type="strong">API access requests</s-text> in the
-                sidebar
-              </s-list-item>
-              <s-list-item>
-                Find{" "}
-                <s-text type="strong">Protected customer data access</s-text> →
-                click <s-text type="strong">Request access</s-text>
-              </s-list-item>
-              <s-list-item>
-                Check: <s-text type="strong">Protected customer data</s-text>,{" "}
-                <s-text type="strong">Name</s-text>,{" "}
-                <s-text type="strong">Email</s-text>,{" "}
-                <s-text type="strong">Address</s-text>,{" "}
-                <s-text type="strong">Phone</s-text>
-              </s-list-item>
-              <s-list-item>
-                For dev stores — approval is instant. For public apps — review
-                is required.
-              </s-list-item>
-            </s-ordered-list>
-            <s-link
-              href="https://shopify.dev/docs/apps/launch/protected-customer-data"
-              target="_blank"
-            >
-              Read Shopify docs on protected customer data →
-            </s-link>
-          </s-stack>
+    <s-page heading={`Welcome to PostShip${shopName ? `, ${shopName}` : ""}!`}>
+      {/* ── Subtitle ──────────────────────────────────────────────────────── */}
+      <s-banner tone="info">
+        <s-paragraph slot="subtitle">
+          Complete these 3 quick steps to get your order tracking page live on
+          your store. It takes less than 5 minutes.
+        </s-paragraph>
+      </s-banner>
+      {/* ── Progress banner ───────────────────────────────────────────────── */}
+      {allDone ? (
+        <s-banner tone="success">
+          🎉 All done! PostShip is live on your store. Redirecting you to the
+          dashboard…
+        </s-banner>
+      ) : (
+        <s-banner tone="info">
+          {completedCount} of 3 steps completed
+          {completedCount === 0
+            ? " — let's get started!"
+            : completedCount === 1
+              ? " — great start, keep going!"
+              : " — almost there!"}
         </s-banner>
       )}
 
-      {error && !needsAccess && (
-        <s-banner tone="warning">Error loading orders: {error}</s-banner>
-      )}
+      {/* ════════════════════════════════════════════════════════════════════
+          STEP 1 — Enable App Embed
+      ════════════════════════════════════════════════════════════════════ */}
+      <s-section heading="Step 1 — Enable PostShip in Your Theme">
+        <s-stack direction="block" gap="base">
+          {steps.step1 ? (
+            <s-banner tone="success">
+              ✓ App embed is enabled. PostShip is active on your storefront.
+            </s-banner>
+          ) : (
+            <s-banner tone="warning">
+              The app embed must be turned on before the tracking widget will
+              appear on your store.
+            </s-banner>
+          )}
 
-      {/* ── Stats ── */}
-      {!needsAccess && (
-        <s-section>
-          <s-grid gridTemplateColumns="repeat(12, 1fr)" gap="base">
-            {[
-              { label: "Total (this page)", value: stats.total },
-              { label: "Fulfilled", value: stats.fulfilled },
-              { label: "Unfulfilled", value: stats.unfulfilled },
-              { label: "In Transit", value: stats.inTransit },
-            ].map(({ label, value }) => (
-              <s-grid-item key={label} gridColumn="span 6" gridRow="span 1">
-                <s-box
-                  padding="base"
-                  borderWidth="base"
-                  borderRadius="base"
-                  background="subdued"
-                >
-                  <s-stack direction="block" gap="small">
-                    <s-text tone="info">{label}</s-text>
-                    <s-heading>{value}</s-heading>
-                  </s-stack>
-                </s-box>
-              </s-grid-item>
-            ))}
-          </s-grid>
-        </s-section>
-      )}
+          <s-paragraph>
+            PostShip uses a Shopify Theme App Extension. You need to enable it
+            once in the Theme Editor so it can render the tracking widget and
+            the floating &quot;Track My Order&quot; button on your storefront.
+          </s-paragraph>
 
-      {/* ── Orders table ── */}
-      <s-section heading="Orders">
-        <s-table
-          paginate={hasNextPage || hasPreviousPage}
-          hasNextPage={hasNextPage}
-          hasPreviousPage={hasPreviousPage}
-          onNextPage={() =>
-            navigate(
-              `/app?cursor=${data.endCursor}&direction=next&status=${statusFilter}`,
-            )
-          }
-          onPreviousPage={() =>
-            navigate(
-              `/app?cursor=${data.startCursor}&direction=prev&status=${statusFilter}`,
-            )
-          }
-        >
-          <s-select
-            slot="filters"
-            label="Fulfillment status"
-            value={statusFilter}
-            onChange={(e: Event) => {
-              const val = (e.currentTarget as HTMLSelectElement).value;
-              navigate(`/app?status=${val}`);
+          <s-stack direction="block" gap="small">
+            <s-text type="strong">How to do it:</s-text>
+            <s-ordered-list>
+              <s-list-item>
+                Click &quot;Open Theme Editor&quot; below — it opens in a new
+                tab.
+              </s-list-item>
+              <s-list-item>
+                In the left sidebar, find the{" "}
+                <s-text type="strong">App embeds</s-text> section (toggle icon
+                at the bottom).
+              </s-list-item>
+              <s-list-item>
+                Find <s-text type="strong">PostShip</s-text> and toggle it{" "}
+                <s-text type="strong">ON</s-text>.
+              </s-list-item>
+              <s-list-item>
+                Click <s-text type="strong">Save</s-text> in the Theme Editor.
+              </s-list-item>
+              <s-list-item>
+                Come back here and click &quot;I&apos;ve enabled it&quot; below.
+              </s-list-item>
+            </s-ordered-list>
+          </s-stack>
+
+          {!steps.step1 && (
+            <s-stack direction="inline" gap="base">
+              <s-button href={themeEditorUrl} target="_blank" variant="primary">
+                Open Theme Editor ↗
+              </s-button>
+              <s-button
+                variant="secondary"
+                onClick={() => completeStep("1")}
+                {...(fetcher.state !== "idle" ? { loading: true } : {})}
+              >
+                ✓ I&apos;ve enabled it
+              </s-button>
+            </s-stack>
+          )}
+
+          {steps.step1 && (
+            <s-stack direction="inline" gap="base">
+              <s-button
+                href={themeEditorUrl}
+                target="_blank"
+                variant="secondary"
+              >
+                Open Theme Editor ↗
+              </s-button>
+            </s-stack>
+          )}
+        </s-stack>
+      </s-section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          STEP 2 — Create a Tracking Page
+      ════════════════════════════════════════════════════════════════════ */}
+      <s-section heading="Step 2 — Create a 'Track Your Order' Page">
+        <s-stack direction="block" gap="base">
+          {steps.step2 ? (
+            <s-banner tone="success">
+              ✓ Tracking page created. Your customers now have a dedicated place
+              to track their orders.
+            </s-banner>
+          ) : (
+            <s-banner tone="info">
+              Your customers need a page to visit when they want to track their
+              order. You&apos;ll add the PostShip widget to this page in Step 3.
+            </s-banner>
+          )}
+
+          <s-paragraph>
+            Create a new page in your Shopify admin with a title like
+            <s-text type="strong"> &quot;Track Your Order&quot;</s-text>. The
+            URL will automatically become{" "}
+            <s-text type="strong">/pages/track-your-order</s-text>, which you
+            can link to from your store&apos;s navigation, order confirmation
+            emails, and footer.
+          </s-paragraph>
+
+          <s-stack direction="block" gap="small">
+            <s-text type="strong">How to do it:</s-text>
+            <s-ordered-list>
+              <s-list-item>
+                Click &quot;Create New Page&quot; below — it opens
+                Shopify&apos;s page editor.
+              </s-list-item>
+              <s-list-item>
+                Set the title to <s-text type="strong">Track Your Order</s-text>
+                .
+              </s-list-item>
+              <s-list-item>
+                Leave the content blank for now (the widget will fill it).
+              </s-list-item>
+              <s-list-item>
+                Set visibility to <s-text type="strong">Visible</s-text> and
+                click Save.
+              </s-list-item>
+              <s-list-item>
+                Come back here and click &quot;I&apos;ve created it&quot; below.
+              </s-list-item>
+            </s-ordered-list>
+          </s-stack>
+
+          {!steps.step2 && (
+            <s-stack direction="inline" gap="base">
+              <s-button href={newPageUrl} target="_blank" variant="primary">
+                Create New Page ↗
+              </s-button>
+              <s-button
+                variant="secondary"
+                onClick={() => completeStep("2")}
+                {...(fetcher.state !== "idle" ? { loading: true } : {})}
+              >
+                ✓ I&apos;ve created the page
+              </s-button>
+            </s-stack>
+          )}
+
+          {steps.step2 && (
+            <s-button href={newPageUrl} target="_blank" variant="secondary">
+              Manage Pages ↗
+            </s-button>
+          )}
+        </s-stack>
+      </s-section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          STEP 3 — Add the Widget Block
+      ════════════════════════════════════════════════════════════════════ */}
+      <s-section heading="Step 3 — Add the PostShip Widget to Your Page">
+        <s-stack direction="block" gap="base">
+          {steps.step3 ? (
+            <s-banner tone="success">
+              ✓ Widget added! The PostShip tracking widget is live on your
+              tracking page. Your customers can now look up their orders.
+            </s-banner>
+          ) : (
+            <s-banner tone="info">
+              This is the final step — add the tracking widget block to the page
+              you created in Step 2.
+            </s-banner>
+          )}
+
+          <s-paragraph>
+            In the Shopify Theme Editor, navigate to the tracking page you just
+            created and add the{" "}
+            <s-text type="strong">PostShip — Order Tracking</s-text> block. This
+            is the customer-facing widget where shoppers enter their order
+            number and email to see their order status, tracking info, and take
+            actions like cancelling or requesting a return.
+          </s-paragraph>
+
+          <s-stack direction="block" gap="small">
+            <s-text type="strong">How to do it:</s-text>
+            <s-ordered-list>
+              <s-list-item>
+                Open the Theme Editor and navigate to your{" "}
+                <s-text type="strong">Track Your Order</s-text> page.
+              </s-list-item>
+              <s-list-item>
+                Click <s-text type="strong">Add section</s-text> or{" "}
+                <s-text type="strong">Add block</s-text> in the left sidebar.
+              </s-list-item>
+              <s-list-item>
+                Find and select{" "}
+                <s-text type="strong">PostShip — Order Tracking</s-text>.
+              </s-list-item>
+              <s-list-item>
+                Customise the heading, colours, and feature toggles as needed.
+              </s-list-item>
+              <s-list-item>
+                Click <s-text type="strong">Save</s-text> and come back here.
+              </s-list-item>
+            </s-ordered-list>
+          </s-stack>
+
+          {!steps.step3 && (
+            <s-stack direction="inline" gap="base">
+              <s-button
+                href={`https://admin.shopify.com/store/${
+                  /* strip .myshopify.com */ ""
+                }/themes/current/editor`}
+                target="_blank"
+                variant="primary"
+              >
+                Open Theme Editor ↗
+              </s-button>
+              <s-button
+                variant="secondary"
+                onClick={() => completeStep("3")}
+                {...(fetcher.state !== "idle" ? { loading: true } : {})}
+              >
+                ✓ I&apos;ve added the widget
+              </s-button>
+            </s-stack>
+          )}
+        </s-stack>
+      </s-section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          VIDEO GUIDE
+      ════════════════════════════════════════════════════════════════════ */}
+      <s-section heading="Video Guide">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            Watch this short walkthrough to see the full setup process from
+            install to a live tracking page in under 5 minutes.
+          </s-paragraph>
+
+          {/* YouTube embed — replace VIDEO_ID with your real video ID */}
+          <div
+            style={{
+              position: "relative",
+              paddingBottom: "56.25%",
+              height: 0,
+              overflow: "hidden",
+              borderRadius: "8px",
+              border: "1px solid var(--p-color-border)",
+              background: "#000",
             }}
           >
-            <s-option value="any">All orders</s-option>
-            <s-option value="unfulfilled">Unfulfilled</s-option>
-            <s-option value="fulfilled">Fulfilled</s-option>
-            <s-option value="partial">Partially fulfilled</s-option>
-          </s-select>
-
-          <s-table-header-row>
-            <s-table-header>Order</s-table-header>
-            <s-table-header>Date</s-table-header>
-            <s-table-header>Items</s-table-header>
-            <s-table-header>Total</s-table-header>
-            <s-table-header>Fulfillment</s-table-header>
-            <s-table-header>Payment</s-table-header>
-            <s-table-header>Tracking</s-table-header>
-            <s-table-header></s-table-header>
-          </s-table-header-row>
-
-          <s-table-body>
-            {orders.length === 0 ? (
-              <s-table-row>
-                <s-table-cell>
-                  <s-paragraph>
-                    {needsAccess
-                      ? "Complete the API access setup above to see orders."
-                      : "No orders found."}
-                  </s-paragraph>
-                </s-table-cell>
-              </s-table-row>
-            ) : (
-              orders.map((order) => {
-                const tracking = order.fulfillments?.[0]?.trackingInfo?.[0];
-                const total = order.totalPriceSet?.shopMoney;
-                return (
-                  <s-table-row key={order.id}>
-                    <s-table-cell>
-                      <s-link
-                        onClick={() =>
-                          navigate(`/app/orders/${order.id.split("/").pop()}`)
-                        }
-                      >
-                        {order.name}
-                      </s-link>
-                    </s-table-cell>
-                    <s-table-cell>{formatDate(order.createdAt)}</s-table-cell>
-                    <s-table-cell>
-                      {order.lineItems.edges.length} item
-                      {order.lineItems.edges.length !== 1 ? "s" : ""}
-                    </s-table-cell>
-                    <s-table-cell>
-                      {total
-                        ? `${total.currencyCode} ${parseFloat(total.amount).toFixed(2)}`
-                        : "—"}
-                    </s-table-cell>
-                    <s-table-cell>
-                      <s-badge
-                        tone={getFulfillmentTone(
-                          order.displayFulfillmentStatus,
-                        )}
-                      >
-                        {formatStatus(order.displayFulfillmentStatus)}
-                      </s-badge>
-                    </s-table-cell>
-                    <s-table-cell>
-                      <s-badge
-                        tone={
-                          order.displayFinancialStatus === "PAID"
-                            ? "success"
-                            : order.displayFinancialStatus === "PENDING"
-                              ? "warning"
-                              : "critical"
-                        }
-                      >
-                        {formatStatus(order.displayFinancialStatus)}
-                      </s-badge>
-                    </s-table-cell>
-                    <s-table-cell>
-                      {tracking ? (
-                        <s-link href={tracking.url} target="_blank">
-                          {tracking.number}
-                        </s-link>
-                      ) : (
-                        <s-text tone="info">No tracking</s-text>
-                      )}
-                    </s-table-cell>
-                    <s-table-cell>
-                      <s-button
-                        variant="tertiary"
-                        onClick={() =>
-                          navigate(`/app/orders/${order.id.split("/").pop()}`)
-                        }
-                      >
-                        View
-                      </s-button>
-                    </s-table-cell>
-                  </s-table-row>
-                );
-              })
-            )}
-          </s-table-body>
-        </s-table>
+            <iframe
+              src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+              title="PostShip Setup Guide"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                border: "none",
+              }}
+            />
+          </div>
+        </s-stack>
       </s-section>
 
-      <s-section slot="aside" heading="PostShip">
+      {/* ── Skip link (aside) ──────────────────────────────────────────────── */}
+      <s-section slot="aside" heading="Already set up?">
         <s-paragraph>
-          Manage post-purchase experience — tracking, returns, cancellations,
-          and support.
+          If you&apos;ve already configured your store manually or want to
+          explore the dashboard first, you can skip this guide.
         </s-paragraph>
-        <s-divider />
+        <fetcher.Form method="post">
+          <input type="hidden" name="intent" value="skip" />
+          <s-button
+            type="submit"
+            variant="secondary"
+            {...(fetcher.state !== "idle" ? { loading: true } : {})}
+          >
+            Skip Setup
+          </s-button>
+        </fetcher.Form>
+      </s-section>
+
+      <s-section slot="aside" heading="Need help?">
         <s-unordered-list>
           <s-list-item>
-            <s-link href="/app/settings">⚙️ Settings</s-link>
+            <s-link href="https://help.postship.app" target="_blank">
+              Documentation ↗
+            </s-link>
           </s-list-item>
           <s-list-item>
-            <s-link href="/app/returns">↩️ Returns</s-link>
+            <s-link href="mailto:support@postship.app">Email support</s-link>
           </s-list-item>
           <s-list-item>
-            <s-link href="/app/cancellations">🚫 Cancellations</s-link>
+            <s-link href="/app/settings">Configure settings</s-link>
           </s-list-item>
         </s-unordered-list>
-      </s-section>
-
-      <s-section slot="aside" heading="Current Plan">
-        <s-badge tone="success" icon="check-circle">
-          Free Plan
-        </s-badge>
-        <s-paragraph>
-          Upgrade to <s-text type="strong">Starter ($9/mo)</s-text> to unlock
-          returns, review requests, and delivery feedback.
-        </s-paragraph>
-        <s-button href="/app/billing" variant="secondary">
-          Upgrade Plan
-        </s-button>
       </s-section>
     </s-page>
   );
 }
-
-export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

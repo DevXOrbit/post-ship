@@ -629,7 +629,51 @@
   visibility: hidden;
   pointer-events: none;
 }
+/* ── WhatsApp button ─────────────────────────────────────────── */
+.ps-whatsapp-wrap {
+  margin: 0 0 16px;
+}
 
+.ps-btn--whatsapp {
+  background: #25d366;
+  color: #fff;
+  width: 100%;
+  border-color: transparent;
+}
+
+.ps-btn--whatsapp:hover {
+  background: #1ebe5d;
+}
+
+/* ── Star rating ─────────────────────────────────────────────── */
+.ps-star-rating {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ps-star-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #d1d5db;
+  line-height: 1;
+  padding: 2px 4px;
+  transition:
+    color 0.1s,
+    transform 0.1s;
+}
+
+.ps-star-btn:hover,
+.ps-star-btn.ps-star--active {
+  color: #f59e0b;
+  transform: scale(1.15);
+}
+
+.ps-feedback-card {
+  margin-top: 16px;
+}
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .ps-tracking-row {

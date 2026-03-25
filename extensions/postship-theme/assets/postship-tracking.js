@@ -1,83 +1,63 @@
 /**
- * PostShip — Order Tracking Extension
- * Customer-facing JS for the theme app extension block.
- * Communicates with the Shopify App Proxy at /apps/postship
+ * PostShip — Order Tracking Extension  (Phase 2 complete)
  *
- * ── Plan gating ───────────────────────────────────────────────────────────
- * On init, fetches /apps/postship/config to get the merchant's active plan.
- * Tabs are shown/hidden based on the plan feature flags:
- *
- *   Free    → Cancel tab only
- *   Starter → Cancel + Returns + Get Help
- *   Pro     → Cancel + Returns + Get Help
- *
- * Block settings (show_cancel, show_returns, show_support) still act as
- * a secondary toggle — both the plan AND the block setting must be enabled.
+ * New in this version:
+ *  - WhatsApp contact button (pre-filled with order number)
+ *  - Delivery Feedback form (star rating + comment, Starter plan gated)
+ *  - Both plan-gated via /config response
  */
 
 (function () {
   "use strict";
 
-  // ── Config ────────────────────────────────────────────────────────────────
   const CFG = window.__postshipConfig || {};
   const PROXY = CFG.appProxy || "/apps/postship";
 
-  // ── DOM helpers ───────────────────────────────────────────────────────────
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
-  /**
-   * show/hide use BOTH the `hidden` attribute AND the `.ps-hidden` CSS class
-   * so Shopify theme CSS that resets [hidden] { display: block } can't
-   * accidentally make the loading overlay or gated tabs visible.
-   */
   const show = (el) => {
     if (!el) return;
     el.removeAttribute("hidden");
     el.classList.remove("ps-hidden");
   };
-
   const hide = (el) => {
     if (!el) return;
     el.setAttribute("hidden", "");
     el.classList.add("ps-hidden");
   };
-
   const setText = (el, text) => el && (el.textContent = text);
   const setHTML = (el, html) => el && (el.innerHTML = html);
 
-  // ── State ─────────────────────────────────────────────────────────────────
   let currentOrder = null;
   let currentEmail = "";
-
-  // Populated after /config fetch — fail-open defaults (most restrictive)
-  let planFeatures = { cancel: false, returns: false, support: false };
+  let planFeatures = {
+    cancel: false,
+    returns: false,
+    support: false,
+    feedback: false,
+  };
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     const root = $("#postship-tracking");
     if (!root) return;
 
-    // Force-hide loading overlay and result panel immediately
     hide($("#ps-loading"));
     hide($("#ps-result"));
     show($("#ps-lookup"));
 
-    // ── Fetch live plan features from proxy ───────────────────────────────
     await loadPlanConfig();
-
-    // Apply plan gates BEFORE showing any tabs
     applyPlanGates();
 
-    // Wire up interactions
     bindLookupForm();
     bindBackButton();
     bindTabs();
     bindCancelForm();
     bindReturnForm();
     bindSupportForm();
+    bindFeedbackForm();
 
-    // Pre-fill from URL params (?order=1001&email=...&auto=1)
     const params = new URLSearchParams(window.location.search);
     const orderParam = params.get("order") || params.get("order_number");
     const emailParam = params.get("email");
@@ -92,51 +72,42 @@
     }
   }
 
-  // ── Fetch plan config ─────────────────────────────────────────────────────
+  // ── Plan config ───────────────────────────────────────────────────────────
   async function loadPlanConfig() {
     try {
       const res = await fetch(PROXY + "/config", {
         headers: { Accept: "application/json" },
       });
-      if (!res.ok) return; // fail open
-
+      if (!res.ok) return;
       const data = await res.json();
-
       if (data.features) {
         planFeatures = {
           cancel: !!data.features.cancel,
           returns: !!data.features.returns,
           support: !!data.features.support,
+          feedback: !!data.features.feedback,
         };
       }
-
-      // Override block setting values with live DB values if present
       if (data.cancelWindowHours != null)
         CFG.cancelWindowHours = data.cancelWindowHours;
       if (data.whatsappNumber) CFG.whatsappNumber = data.whatsappNumber;
     } catch {
-      // Network error — fail open, tracking form still works
+      /* fail open */
     }
   }
 
-  // ── Apply plan gates ──────────────────────────────────────────────────────
-  // Shows a tab only if BOTH the plan allows it AND the block setting is enabled.
   function applyPlanGates() {
     const cancelAllowed = planFeatures.cancel && CFG.showCancel !== false;
     const returnsAllowed = planFeatures.returns && CFG.showReturns !== false;
     const supportAllowed = planFeatures.support && CFG.showSupport !== false;
 
     toggleTab("cancel", cancelAllowed);
-    toggleTab("return", returnsAllowed);
+    toggleTab("returns", returnsAllowed);
     toggleTab("support", supportAllowed);
 
-    // If no action tabs are visible, hide the whole tabs section
+    const anyTab = cancelAllowed || returnsAllowed || supportAllowed;
     const tabsContainer = $("#ps-actions-tabs");
-    if (tabsContainer) {
-      cancelAllowed || returnsAllowed || supportAllowed
-        ? show(tabsContainer)
-        : hide(tabsContainer);
-    }
+    if (tabsContainer) anyTab ? show(tabsContainer) : hide(tabsContainer);
   }
 
   function toggleTab(name, visible) {
@@ -144,7 +115,6 @@
     const panel = $(`#ps-panel-${name}`);
     if (visible) {
       if (btn) show(btn);
-      // Panel visibility is controlled by tab click, not here
     } else {
       if (btn) hide(btn);
       if (panel) hide(panel);
@@ -157,9 +127,10 @@
     if (!form) return;
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const orderNumber = $("#ps-order-number").value.trim();
-      const email = $("#ps-email").value.trim();
-      lookupOrder(orderNumber, email);
+      lookupOrder(
+        $("#ps-order-number").value.trim(),
+        $("#ps-email").value.trim(),
+      );
     });
   }
 
@@ -168,16 +139,13 @@
       showLookupError("Please enter both your order number and email address.");
       return;
     }
-
     setLookupLoading(true);
     hideLookupError();
-
     try {
       const res = await apiFetch("/order-lookup", {
         method: "POST",
         body: JSON.stringify({ order_number: orderNumber, email }),
       });
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
@@ -185,7 +153,6 @@
             "We couldn't find an order matching those details. Please check your order number and email.",
         );
       }
-
       const order = await res.json();
       currentOrder = order;
       currentEmail = email;
@@ -213,7 +180,6 @@
     el.textContent = msg;
     show(el);
   }
-
   function hideLookupError() {
     hide($("#ps-lookup-error"));
   }
@@ -235,19 +201,25 @@
         "ps-badge ps-badge--" + statusClass(order.fulfillment_status);
     }
 
+    // Tracking info
     const tracking = order.fulfillments?.[0]?.tracking_info?.[0];
-    const fulfillmentStatus = order.fulfillments?.[0]?.status;
+    console.log(order.fulfillments);
     const trackingSection = $("#ps-tracking-section");
     if (tracking?.number && trackingSection) {
       show(trackingSection);
       setText($("#ps-tracking-number"), tracking.number);
+      setText($("#ps-tracking-status"), tracking.status);
       setText(
-        "#ps-carrier-name" in document ? $("#ps-carrier-name") : null,
+        $("#ps-carrier-name"),
+        tracking.company || order.fulfillments?.[0]?.tracking_company || "—",
+      );
+      setText(
+        $("#ps-carrier"),
         tracking.company || order.fulfillments?.[0]?.tracking_company || "—",
       );
       setText(
         $("#ps-fulfillment-status"),
-        formatStatus(fulfillmentStatus || "in_transit"),
+        formatStatus(order.fulfillments?.[0]?.status || "in_transit"),
       );
       const trackingLink = $("#ps-tracking-link");
       if (trackingLink && tracking.url) {
@@ -258,6 +230,7 @@
       hide(trackingSection);
     }
 
+    // Line items
     const itemsList = $("#ps-items-list");
     if (itemsList && order.line_items?.length) {
       setHTML(
@@ -265,24 +238,25 @@
         order.line_items
           .map(
             (item) => `
-          <div class="ps-item">
-            ${
-              item.image
-                ? `<img class="ps-item__img" src="${escHtml(item.image)}" alt="${escHtml(item.title)}" loading="lazy">`
-                : `<div class="ps-item__img ps-item__img--placeholder"></div>`
-            }
-            <div class="ps-item__info">
-              <span class="ps-item__title">${escHtml(item.title)}</span>
-              ${item.variant_title ? `<span class="ps-item__variant">${escHtml(item.variant_title)}</span>` : ""}
-              <span class="ps-item__qty">Qty: ${item.quantity}</span>
-            </div>
-            <span class="ps-item__price">${formatMoney(item.price, order.currency)}</span>
-          </div>`,
+        <div class="ps-item">
+          ${
+            item.image
+              ? `<img class="ps-item__img" src="${escHtml(item.image)}" alt="${escHtml(item.title)}" loading="lazy">`
+              : `<div class="ps-item__img ps-item__img--placeholder"></div>`
+          }
+          <div class="ps-item__info">
+            <span class="ps-item__title">${escHtml(item.title)}</span>
+            ${item.variant_title ? `<span class="ps-item__variant">${escHtml(item.variant_title)}</span>` : ""}
+            <span class="ps-item__qty">Qty: ${item.quantity}</span>
+          </div>
+          <span class="ps-item__price">${formatMoney(item.price, order.currency)}</span>
+        </div>`,
           )
           .join(""),
       );
     }
 
+    // Shipping address
     const addrSection = $("#ps-address-section");
     const addrEl = $("#ps-shipping-address");
     if (addrEl && order.shipping_address) {
@@ -306,6 +280,39 @@
 
     populateActionForms(order);
     updateCancelAvailability(order);
+
+    // ── WhatsApp button ──────────────────────────────────────────────────
+    const whatsappWrap = $("#ps-whatsapp-wrap");
+    const whatsappBtn = $("#ps-whatsapp-btn");
+    const waNumber = CFG.whatsappNumber || "";
+    if (whatsappWrap && whatsappBtn && waNumber) {
+      const orderNum = order.name.replace("#", "");
+      const message = encodeURIComponent(
+        `Hi! I need help with my order ${order.name}.`,
+      );
+      const phone = waNumber.replace(/\D/g, "");
+      whatsappBtn.href = `https://wa.me/${phone}?text=${message}`;
+      show(whatsappWrap);
+    } else if (whatsappWrap) {
+      hide(whatsappWrap);
+    }
+
+    // ── Delivery feedback ────────────────────────────────────────────────
+    const isDelivered =
+      order.fulfillment_status === "fulfilled" ||
+      order.fulfillments?.some((f) => f.status === "delivered");
+    const feedbackWrap = $("#ps-feedback-wrap");
+    if (
+      feedbackWrap &&
+      planFeatures.feedback &&
+      CFG.showFeedback !== false &&
+      isDelivered
+    ) {
+      show(feedbackWrap);
+    } else if (feedbackWrap) {
+      hide(feedbackWrap);
+    }
+
     activateFirstVisibleTab();
   }
 
@@ -322,10 +329,10 @@
         order.line_items
           .map(
             (item) => `
-          <label class="ps-checkbox-label">
-            <input type="checkbox" name="return_items" value="${escHtml(item.id)}" data-title="${escHtml(item.title)}">
-            <span>${escHtml(item.title)}${item.variant_title ? ` — ${escHtml(item.variant_title)}` : ""} (×${item.quantity})</span>
-          </label>`,
+        <label class="ps-checkbox-label">
+          <input type="checkbox" name="return_items" value="${escHtml(item.id)}" data-title="${escHtml(item.title)}">
+          <span>${escHtml(item.title)}${item.variant_title ? ` — ${escHtml(item.variant_title)}` : ""} (×${item.quantity})</span>
+        </label>`,
           )
           .join(""),
       );
@@ -335,10 +342,9 @@
   function updateCancelAvailability(order) {
     const isCancelled = !!order.cancelled_at;
     const isFulfilled = order.fulfillment_status === "fulfilled";
-    const orderAgeHours =
+    const ageHours =
       (Date.now() - new Date(order.created_at).getTime()) / 3600000;
-    const withinWindow = orderAgeHours <= (CFG.cancelWindowHours || 2);
-
+    const withinWindow = ageHours <= (CFG.cancelWindowHours || 2);
     if (isCancelled || isFulfilled || !withinWindow) {
       hide($("#ps-cancel-allowed"));
       show($("#ps-cancel-blocked"));
@@ -380,35 +386,21 @@
   function bindCancelForm() {
     const form = $("#ps-cancel-form");
     if (!form) return;
-
     const reasonSelect = $("#ps-cancel-reason");
     if (reasonSelect) {
       reasonSelect.addEventListener("change", () => {
         const otherWrap = $("#ps-cancel-other-wrap");
-        if (otherWrap) {
+        if (otherWrap)
           reasonSelect.value === "other" ? show(otherWrap) : hide(otherWrap);
-        }
       });
     }
-
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!currentOrder) return;
-      if (!planFeatures.cancel) {
-        showFormMsg(
-          "#ps-cancel-msg",
-          "This feature requires an active PostShip subscription.",
-          "error",
-        );
-        return;
-      }
-
+      if (!currentOrder || !planFeatures.cancel) return;
       const reason = $("#ps-cancel-reason")?.value || "customer";
       const notes = $("#ps-cancel-other")?.value || "";
-
       setFormLoading(form, true);
       hideFormMsg("#ps-cancel-msg");
-
       try {
         const res = await apiFetch("/cancel-request", {
           method: "POST",
@@ -442,16 +434,7 @@
     if (!form) return;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!currentOrder) return;
-      if (!planFeatures.returns) {
-        showFormMsg(
-          "#ps-return-msg",
-          "Return requests require a Starter plan or above.",
-          "error",
-        );
-        return;
-      }
-
+      if (!currentOrder || !planFeatures.returns) return;
       const checkedItems = $$('input[name="return_items"]:checked', form);
       if (checkedItems.length === 0) {
         showFormMsg(
@@ -461,7 +444,6 @@
         );
         return;
       }
-
       const items = checkedItems.map((cb) => ({
         id: cb.value,
         title: cb.dataset.title,
@@ -470,10 +452,8 @@
         $('input[name="return_type"]:checked', form)?.value || "return";
       const reason = $("#ps-return-reason").value;
       const notes = $("#ps-return-notes").value;
-
       setFormLoading(form, true);
       hideFormMsg("#ps-return-msg");
-
       try {
         const res = await apiFetch("/return-request", {
           method: "POST",
@@ -509,27 +489,15 @@
     if (!form) return;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!currentOrder) return;
-      if (!planFeatures.support) {
-        showFormMsg(
-          "#ps-support-msg",
-          "Support tickets require a Starter plan or above.",
-          "error",
-        );
-        return;
-      }
-
+      if (!currentOrder || !planFeatures.support) return;
       const issueType = $("#ps-issue-type").value;
       const description = $("#ps-issue-desc").value.trim();
-
       if (!description) {
         showFormMsg("#ps-support-msg", "Please describe your issue.", "error");
         return;
       }
-
       setFormLoading(form, true);
       hideFormMsg("#ps-support-msg");
-
       try {
         const res = await apiFetch("/support-ticket", {
           method: "POST",
@@ -557,6 +525,99 @@
     });
   }
 
+  // ── Feedback form (star rating) ───────────────────────────────────────────
+  function bindFeedbackForm() {
+    const stars = $$(".ps-star-btn");
+    const ratingInput = $("#ps-feedback-rating");
+    const formWrap = $("#ps-feedback-form-wrap");
+
+    stars.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const rating = parseInt(btn.dataset.rating, 10);
+        if (ratingInput) ratingInput.value = String(rating);
+        // Highlight stars up to the selected rating
+        stars.forEach((s) => {
+          const r = parseInt(s.dataset.rating, 10);
+          r <= rating
+            ? s.classList.add("ps-star--active")
+            : s.classList.remove("ps-star--active");
+        });
+        if (formWrap) show(formWrap);
+      });
+
+      // Hover effect
+      btn.addEventListener("mouseenter", () => {
+        const hoverRating = parseInt(btn.dataset.rating, 10);
+        stars.forEach((s) => {
+          parseInt(s.dataset.rating, 10) <= hoverRating
+            ? s.classList.add("ps-star--active")
+            : s.classList.remove("ps-star--active");
+        });
+      });
+    });
+
+    // Reset hover on mouse leave
+    const starContainer = $("#ps-feedback-stars");
+    if (starContainer) {
+      starContainer.addEventListener("mouseleave", () => {
+        const selected = ratingInput ? parseInt(ratingInput.value, 10) : 0;
+        stars.forEach((s) => {
+          parseInt(s.dataset.rating, 10) <= selected
+            ? s.classList.add("ps-star--active")
+            : s.classList.remove("ps-star--active");
+        });
+      });
+    }
+
+    const form = $("#ps-feedback-form");
+    if (!form) return;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!currentOrder) return;
+
+      const rating = parseInt(ratingInput?.value || "0", 10);
+      if (!rating) {
+        showFormMsg(
+          "#ps-feedback-msg",
+          "Please select a star rating.",
+          "error",
+        );
+        return;
+      }
+
+      const comment = $("#ps-feedback-comment")?.value || "";
+
+      setFormLoading(form, true);
+      hideFormMsg("#ps-feedback-msg");
+
+      try {
+        const res = await apiFetch("/delivery-feedback", {
+          method: "POST",
+          body: JSON.stringify({
+            order_id: currentOrder.id,
+            order_name: currentOrder.name,
+            email: currentEmail,
+            rating,
+            comment,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.error || "Could not submit feedback.");
+
+        // Show thank you, hide the form
+        hide(formWrap);
+        hide(starContainer);
+        show($("#ps-feedback-thanks"));
+      } catch (err) {
+        showFormMsg("#ps-feedback-msg", err.message, "error");
+      } finally {
+        setFormLoading(form, false);
+      }
+    });
+  }
+
   // ── API helper ────────────────────────────────────────────────────────────
   function apiFetch(path, options = {}) {
     return fetch(PROXY + path, {
@@ -569,7 +630,6 @@
     });
   }
 
-  // ── Form helpers ──────────────────────────────────────────────────────────
   function setFormLoading(form, loading) {
     const btn = $('[type="submit"]', form);
     if (btn) btn.disabled = loading;
