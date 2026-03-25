@@ -5,30 +5,118 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
 }
 
+// ─── Shopify Session Storage ─────────────────────────────────────────────────
+
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+// ─── PostShip: App Settings ──────────────────────────────────────────────────
+
+model AppSettings {
+  id                        String   @id @default(cuid())
+  shop                      String   @unique
+  cancellationWindowHours   Int      @default(2)
+  whatsappNumber            String   @default("")
+  reviewRequestDelayDays    Int      @default(7)
+  emailProvider             String   @default("resend")
+  brandColor                String   @default("#5c6ac4")
+  senderName                String   @default("")
+  enableTrackingEmails      Boolean  @default(true)
+  enableReviewEmails        Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+}
+
+// ─── PostShip: Return Requests ───────────────────────────────────────────────
+
+model ReturnRequest {
+  id            String   @id @default(cuid())
+  shop          String
+  orderId       String
+  orderName     String
+  customerEmail String
+  items         String   // JSON string of selected items
+  reason        String
+  notes         String   @default("")
+  type          String   @default("return") // "return" | "exchange"
+  status        String   @default("pending") // pending | approved | rejected | processing | completed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shop])
+  @@index([orderId])
+}
+
+// ─── PostShip: Cancellation Requests ────────────────────────────────────────
+
+model CancellationRequest {
+  id            String   @id @default(cuid())
+  shop          String
+  orderId       String
+  orderName     String
+  customerEmail String
+  reason        String
+  status        String   @default("pending") // pending | approved | rejected | auto-rejected
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shop])
+  @@index([orderId])
+}
+
+// ─── PostShip: Delivery Feedback (Phase 2) ───────────────────────────────────
+
+model DeliveryFeedback {
+  id            String   @id @default(cuid())
+  shop          String
+  orderId       String
+  orderName     String
+  customerEmail String
+  rating        Int      // 1–5
+  comment       String   @default("")
+  createdAt     DateTime @default(now())
+
+  @@index([shop])
+}
+
+// ─── PostShip: Support Tickets (Phase 2) ─────────────────────────────────────
+
+model SupportTicket {
+  id            String   @id @default(cuid())
+  shop          String
+  orderId       String
+  orderName     String
+  customerEmail String
+  issueType     String   // "damaged" | "missing" | "wrong" | "other"
+  description   String
+  status        String   @default("open") // open | in_progress | resolved
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shop])
+  @@index([status])
 }
