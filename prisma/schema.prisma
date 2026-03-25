@@ -1,5 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -7,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:dev.sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Shopify Session Storage ─────────────────────────────────────────────────
@@ -35,42 +34,58 @@ model Session {
 // ─── PostShip: App Settings ──────────────────────────────────────────────────
 
 model AppSettings {
-  id                        String   @id @default(cuid())
-  shop                      String   @unique
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  // ── Subscription plan ────────────────────────────────────────────────────
+  // ── Subscription ──────────────────────────────────────────────────────────
   // "free" | "starter" | "pro"
-  // Updated by the Shopify Billing API webhook / callback in Phase 3.
-  // Controls which features are exposed on the storefront via the proxy.
-  plan                      String   @default("free")
+  // Set by Shopify Billing API callback (Phase 3).
+  plan      String @default("free")
 
-  cancellationWindowHours   Int      @default(2)
-  whatsappNumber            String   @default("")
-  reviewRequestDelayDays    Int      @default(7)
-  emailProvider             String   @default("resend")
-  brandColor                String   @default("#5c6ac4")
-  senderName                String   @default("")
-  enableTrackingEmails      Boolean  @default(true)
-  enableReviewEmails        Boolean  @default(false)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  // ── Order management ──────────────────────────────────────────────────────
+  cancellationWindowHours Int @default(2)
+
+  // ── Email ─────────────────────────────────────────────────────────────────
+  // Resend API key stored per-merchant (they supply their own key on free plan,
+  // or we use a shared platform key on Starter/Pro — Phase 3 decision).
+  resendApiKey        String  @default("")
+  fromEmail           String  @default("")        // e.g. "orders@yourstore.com"
+  senderName          String  @default("")        // e.g. "Your Store"
+
+  enableTrackingEmails Boolean @default(true)
+  enableReviewEmails   Boolean @default(false)    // Starter+
+
+  // ── Post-delivery review + coupon ─────────────────────────────────────────
+  reviewRequestDelayDays Int     @default(7)      // days after delivered
+  enableCoupon           Boolean @default(false)  // include coupon in review email
+  couponCode             String  @default("")     // e.g. "THANKYOU10"
+  couponDiscountPercent  Int     @default(10)     // 1–100
+  couponExpiryDays       Int     @default(30)     // days until coupon expires
+
+  // ── Branding ──────────────────────────────────────────────────────────────
+  brandColor String @default("#5c6ac4")
+
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
+  whatsappNumber String @default("")   // include country code e.g. +1234567890
 }
 
 // ─── PostShip: Return Requests ───────────────────────────────────────────────
 
 model ReturnRequest {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   shop          String
   orderId       String
   orderName     String
   customerEmail String
-  items         String   // JSON string of selected items
+  items         String    // JSON: Array<{ id, title }>
   reason        String
-  notes         String   @default("")
-  type          String   @default("return") // "return" | "exchange"
-  status        String   @default("pending") // pending | approved | rejected | processing | completed
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  notes         String    @default("")
+  type          String    @default("return")   // "return" | "exchange"
+  status        String    @default("pending")  // pending | approved | rejected | processing | completed
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([shop])
   @@index([orderId])
@@ -79,22 +94,42 @@ model ReturnRequest {
 // ─── PostShip: Cancellation Requests ────────────────────────────────────────
 
 model CancellationRequest {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   shop          String
   orderId       String
   orderName     String
   customerEmail String
   reason        String
-  status        String   @default("pending") // pending | approved | rejected | auto-rejected
+  notes         String    @default("")
+  status        String    @default("pending")  // pending | approved | rejected | auto-rejected
   processedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([shop])
   @@index([orderId])
 }
 
-// ─── PostShip: Delivery Feedback (Phase 2) ───────────────────────────────────
+// ─── PostShip: Support Tickets ───────────────────────────────────────────────
+
+model SupportTicket {
+  id            String    @id @default(cuid())
+  shop          String
+  orderId       String
+  orderName     String
+  customerEmail String
+  issueType     String    // "damaged" | "missing" | "wrong_item" | "not_delivered" | "other"
+  description   String
+  status        String    @default("open")  // open | in_progress | resolved
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([shop])
+  @@index([status])
+}
+
+// ─── PostShip: Delivery Feedback ─────────────────────────────────────────────
 
 model DeliveryFeedback {
   id            String   @id @default(cuid())
@@ -107,23 +142,19 @@ model DeliveryFeedback {
   createdAt     DateTime @default(now())
 
   @@index([shop])
+  @@index([orderId])
 }
 
-// ─── PostShip: Support Tickets (Phase 2) ─────────────────────────────────────
+// ─── PostShip: Email Log (dedup + audit) ─────────────────────────────────────
+// Prevents duplicate tracking emails if the webhook fires more than once.
 
-model SupportTicket {
-  id            String   @id @default(cuid())
-  shop          String
-  orderId       String
-  orderName     String
-  customerEmail String
-  issueType     String   // "damaged" | "missing" | "wrong" | "other"
-  description   String
-  status        String   @default("open") // open | in_progress | resolved
-  resolvedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model EmailLog {
+  id        String   @id @default(cuid())
+  shop      String
+  orderId   String
+  type      String   // "tracking_shipped" | "tracking_delivered" | "review_request"
+  sentAt    DateTime @default(now())
 
+  @@unique([shop, orderId, type])   // one email per order per type per shop
   @@index([shop])
-  @@index([status])
 }

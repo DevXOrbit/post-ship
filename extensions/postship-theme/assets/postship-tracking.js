@@ -127,7 +127,7 @@
     const supportAllowed = planFeatures.support && CFG.showSupport !== false;
 
     toggleTab("cancel", cancelAllowed);
-    toggleTab("returns", returnsAllowed);
+    toggleTab("return", returnsAllowed);
     toggleTab("support", supportAllowed);
 
     // If no action tabs are visible, hide the whole tabs section

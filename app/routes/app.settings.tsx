@@ -1,3 +1,10 @@
+/**
+ * app/routes/app.settings.tsx
+ *
+ * PostShip Settings — fully wired to the DB via getSettings / upsertSettings.
+ * All Phase 2 fields are live: Resend API key, from email, coupon config,
+ * review delay, brand color, WhatsApp number.
+ */
 import type {
   LoaderFunctionArgs,
   ActionFunctionArgs,
@@ -6,89 +13,85 @@ import type {
 import { useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import {
+  getSettings,
+  upsertSettings,
+  type AppSettingsData,
+} from "../lib/settings.server";
 
-interface Settings {
-  cancellationWindowHours: number;
-  whatsappNumber: string;
-  reviewRequestDelayDays: number;
-  emailProvider: string;
-  brandColor: string;
-  senderName: string;
-  enableTrackingEmails: boolean;
-  enableReviewEmails: boolean;
-}
-
-const DEFAULT_SETTINGS: Settings = {
-  cancellationWindowHours: 2,
-  whatsappNumber: "",
-  reviewRequestDelayDays: 7,
-  emailProvider: "resend",
-  brandColor: "#5c6ac4",
-  senderName: "",
-  enableTrackingEmails: true,
-  enableReviewEmails: false,
-};
-
+// ── Loader ─────────────────────────────────────────────────────────────────
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
 
-  // Load shop info for defaults
-  const shopResponse = await admin.graphql(`
-    #graphql
-    query getShop {
-      shop {
-        name
-        email
-        primaryDomain { url }
+  const [shopResponse, settings] = await Promise.all([
+    admin.graphql(`#graphql
+      query getShop {
+        shop { name email primaryDomain { url } }
       }
-    }
-  `);
+    `),
+    getSettings(session.shop),
+  ]);
+
   const shopJson = await shopResponse.json();
-  const shop = shopJson.data?.shop;
+  const shopInfo = shopJson.data?.shop ?? null;
 
-  // In production, load from DB. For now return defaults.
-  const settings: Settings = {
-    ...DEFAULT_SETTINGS,
-    senderName: shop?.name ?? "",
-  };
+  // Use shop name as senderName default if not yet set
+  if (!settings.senderName && shopInfo?.name) {
+    settings.senderName = shopInfo.name;
+  }
+  if (!settings.fromEmail && shopInfo?.email) {
+    settings.fromEmail = shopInfo.email;
+  }
 
-  return { settings, shop, shopDomain: session.shop };
+  return { settings, shopInfo, shopDomain: session.shop };
 };
 
+// ── Action ─────────────────────────────────────────────────────────────────
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const formData = await request.formData();
 
-  const settings: Settings = {
+  const data: Partial<AppSettingsData> = {
+    senderName: (formData.get("senderName") as string) || "",
+    fromEmail: (formData.get("fromEmail") as string) || "",
+    resendApiKey: (formData.get("resendApiKey") as string) || "",
+    brandColor: (formData.get("brandColor") as string) || "#5c6ac4",
     cancellationWindowHours:
       parseInt(formData.get("cancellationWindowHours") as string) || 2,
     whatsappNumber: (formData.get("whatsappNumber") as string) || "",
+    enableTrackingEmails: formData.get("enableTrackingEmails") === "true",
+    enableReviewEmails: formData.get("enableReviewEmails") === "true",
     reviewRequestDelayDays:
       parseInt(formData.get("reviewRequestDelayDays") as string) || 7,
-    emailProvider: (formData.get("emailProvider") as string) || "resend",
-    brandColor: (formData.get("brandColor") as string) || "#5c6ac4",
-    senderName: (formData.get("senderName") as string) || "",
-    enableTrackingEmails: formData.get("enableTrackingEmails") === "on",
-    enableReviewEmails: formData.get("enableReviewEmails") === "on",
+    enableCoupon: formData.get("enableCoupon") === "true",
+    couponCode: (formData.get("couponCode") as string) || "",
+    couponDiscountPercent:
+      parseInt(formData.get("couponDiscountPercent") as string) || 10,
+    couponExpiryDays:
+      parseInt(formData.get("couponExpiryDays") as string) || 30,
   };
 
-  // In production: save to DB
-  console.log("Saving settings:", settings);
+  await upsertSettings(session.shop, data);
 
-  return { success: true, settings };
+  return { success: true, settings: await getSettings(session.shop) };
 };
 
+// ── Component ──────────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const { settings, shop } = useLoaderData<typeof loader>() as {
-    settings: Settings;
-    shop: { name: string; email: string; primaryDomain: { url: string } };
+  const { settings, shopInfo, shopDomain } = useLoaderData<typeof loader>() as {
+    settings: AppSettingsData;
+    shopInfo: {
+      name: string;
+      email: string;
+      primaryDomain: { url: string };
+    } | null;
     shopDomain: string;
   };
-  const fetcher = useFetcher<{ success: boolean; settings: Settings }>();
 
+  const fetcher = useFetcher<{ success: boolean; settings: AppSettingsData }>();
   const isSubmitting = fetcher.state !== "idle";
   const saved = fetcher.data?.success;
-  const current = fetcher.data?.settings ?? settings;
+  const current: AppSettingsData = fetcher.data?.settings ?? settings;
 
   return (
     <s-page heading="PostShip Settings">
@@ -97,14 +100,14 @@ export default function SettingsPage() {
       )}
 
       <fetcher.Form method="post">
-        {/* Order Management Settings */}
         <s-stack gap="base">
+          {/* ── Order Management ─────────────────────────────────────────── */}
           <s-section heading="Order Management">
             <s-stack direction="block" gap="base">
               <s-number-field
                 name="cancellationWindowHours"
                 label="Cancellation window (hours)"
-                details="How long after placing an order a customer can request cancellation"
+                details="How long after placing an order a customer can request cancellation. Set 0 to disable."
                 value={String(current.cancellationWindowHours)}
                 min={0}
                 max={72}
@@ -112,92 +115,134 @@ export default function SettingsPage() {
             </s-stack>
           </s-section>
 
-          {/* Email Settings */}
-          <s-section heading="Email Notifications">
-            <s-stack direction="block" gap="base">
-              <s-text-field
-                name="senderName"
-                label="Sender name"
-                details="Displayed as the 'From' name in emails to customers"
-                value={current.senderName}
-                placeholder={shop?.name ?? "Your Store"}
-              />
-
-              <s-select
-                name="emailProvider"
-                label="Email provider"
-                value={current.emailProvider}
-              >
-                <s-option value="resend">
-                  Resend (recommended — 3,000 free/month)
-                </s-option>
-                <s-option value="sendgrid">SendGrid</s-option>
-                <s-option value="shopify">Shopify Email</s-option>
-              </s-select>
-
-              <s-switch
-                name="enableTrackingEmails"
-                label="Send tracking update emails"
-                details="Notify customers when their order ships, is out for delivery, or delivered"
-                checked={current.enableTrackingEmails}
-              />
-
-              <s-switch
-                name="enableReviewEmails"
-                label="Send post-delivery review requests"
-                details="Available on Starter plan and above"
-                checked={current.enableReviewEmails}
-                disabled
-              />
-            </s-stack>
-          </s-section>
-
-          {/* Branding */}
+          {/* ── Branding ─────────────────────────────────────────────────── */}
           <s-section heading="Branding">
             <s-stack direction="block" gap="base">
               <s-color-field
                 name="brandColor"
                 label="Brand color"
-                details="Used in customer-facing emails and the tracking page"
+                details="Used as the accent color in customer-facing emails and the tracking widget."
                 value={current.brandColor}
               />
             </s-stack>
           </s-section>
 
-          {/* WhatsApp (Phase 3 preview) */}
-          <s-section heading="WhatsApp Contact Button">
+          {/* ── Email ────────────────────────────────────────────────────── */}
+          <s-section heading="Email Notifications">
+            <s-stack direction="block" gap="base">
+              <s-text-field
+                name="senderName"
+                label="Sender name"
+                details="Displayed as the 'From' name in emails sent to customers."
+                value={current.senderName}
+                placeholder={shopInfo?.name ?? "Your Store"}
+              />
+
+              <s-text-field
+                name="fromEmail"
+                label="From email address"
+                details="The reply-to address for customer emails. Must be verified in Resend."
+                value={current.fromEmail}
+                placeholder={shopInfo?.email ?? "orders@yourstore.com"}
+              />
+
+              <s-text-field
+                name="resendApiKey"
+                label="Resend API key"
+                details="Get your API key at resend.com. Starts with re_. Required to send emails."
+                value={current.resendApiKey}
+                placeholder="re_xxxxxxxxxxxxxxxxxxxx"
+              />
+
+              <s-divider />
+
+              <s-switch
+                name="enableTrackingEmails"
+                label="Send tracking update emails"
+                details="Notify customers automatically when their order ships or is delivered."
+                checked={current.enableTrackingEmails}
+                value="true"
+              />
+
+              <s-switch
+                name="enableReviewEmails"
+                label="Send post-delivery review requests"
+                details="Automatically email customers asking for a review after delivery. Starter plan required."
+                checked={current.enableReviewEmails}
+                value="true"
+              />
+            </s-stack>
+          </s-section>
+
+          {/* ── Review Request + Coupon ───────────────────────────────────── */}
+          <s-section heading="Review Requests & Coupons">
             <s-banner tone="info">
-              WhatsApp notifications are available on the Pro plan. The contact
-              button below is free.
+              Review requests and coupons require the Starter plan or above.
             </s-banner>
             <s-stack direction="block" gap="base">
+              <s-number-field
+                name="reviewRequestDelayDays"
+                label="Days after delivery to send review email"
+                details="How many days to wait after an order is marked delivered before sending the review request."
+                value={String(current.reviewRequestDelayDays)}
+                min={1}
+                max={60}
+              />
+
+              <s-switch
+                name="enableCoupon"
+                label="Include a discount coupon in review emails"
+                details="Reward customers with a coupon code to encourage repeat purchases."
+                checked={current.enableCoupon}
+                value="true"
+              />
+
+              <s-text-field
+                name="couponCode"
+                label="Coupon code"
+                details="The discount code to include in the email. Create it first in Shopify Admin → Discounts."
+                value={current.couponCode}
+                placeholder="THANKYOU10"
+              />
+
+              <s-number-field
+                name="couponDiscountPercent"
+                label="Discount percentage"
+                details="Shown in the email to the customer (informational — create the actual discount in Shopify)."
+                value={String(current.couponDiscountPercent)}
+                min={1}
+                max={100}
+              />
+
+              <s-number-field
+                name="couponExpiryDays"
+                label="Coupon valid for (days)"
+                details="Shown in the email. Set the same expiry on the Shopify discount code."
+                value={String(current.couponExpiryDays)}
+                min={1}
+                max={365}
+              />
+            </s-stack>
+          </s-section>
+
+          {/* ── WhatsApp ─────────────────────────────────────────────────── */}
+          <s-section heading="WhatsApp Contact Button">
+            <s-stack direction="block" gap="base">
+              <s-paragraph>
+                Show a WhatsApp button on the order tracking widget so customers
+                can contact you instantly with their order number pre-filled.
+              </s-paragraph>
               <s-text-field
                 name="whatsappNumber"
                 label="WhatsApp business number"
-                details="Include country code, e.g. +1234567890. Used for the 'Contact via WhatsApp' button."
+                details="Include country code, e.g. +1234567890. Leave blank to hide the button."
                 value={current.whatsappNumber}
                 placeholder="+1234567890"
               />
             </s-stack>
           </s-section>
 
-          {/* Review requests (Phase 2 preview) */}
-          <s-section heading="Review Requests">
-            <s-banner tone="info">
-              Automated review requests are available on the Starter plan.
-            </s-banner>
-            <s-stack direction="block" gap="base">
-              <s-number-field
-                name="reviewRequestDelayDays"
-                label="Days after delivery to send review request"
-                value={String(current.reviewRequestDelayDays)}
-                min={1}
-                max={30}
-                disabled
-              />
-            </s-stack>
-          </s-section>
-
+          {/* ── Save ─────────────────────────────────────────────────────── */}
           <s-section>
             <s-button
               type="submit"
@@ -209,26 +254,53 @@ export default function SettingsPage() {
         </s-stack>
       </fetcher.Form>
 
-      {/* Aside */}
-      <s-section slot="aside" heading="Quick Help">
+      {/* ── Aside ──────────────────────────────────────────────────────────── */}
+      <s-section slot="aside" heading="Store Info">
+        <s-stack direction="block" gap="small">
+          <s-text type="strong">{shopInfo?.name}</s-text>
+          <s-text tone="info">{shopInfo?.email}</s-text>
+          <s-text tone="info">{shopInfo?.primaryDomain?.url}</s-text>
+        </s-stack>
+      </s-section>
+
+      <s-section slot="aside" heading="Current Plan">
+        <s-stack direction="block" gap="small">
+          <s-badge tone={current.plan === "free" ? undefined : "success"}>
+            {current.plan.charAt(0).toUpperCase() + current.plan.slice(1)} Plan
+          </s-badge>
+          {current.plan === "free" && (
+            <>
+              <s-paragraph>
+                Upgrade to <s-text type="strong">Starter ($9/mo)</s-text> to
+                unlock review emails, coupons, and delivery feedback.
+              </s-paragraph>
+              <s-button href="/app/billing" variant="secondary">
+                Upgrade Plan
+              </s-button>
+            </>
+          )}
+        </s-stack>
+      </s-section>
+
+      <s-section slot="aside" heading="Quick Links">
         <s-unordered-list>
           <s-list-item>
-            <s-link href="https://docs.anthropic.com" target="_blank">
-              Documentation
+            <s-link href="https://resend.com/api-keys" target="_blank">
+              Get Resend API key ↗
             </s-link>
           </s-list-item>
           <s-list-item>
-            <s-link href="/app/billing">Upgrade plan</s-link>
+            <s-link
+              href={`https://${shopDomain}/admin/discounts`}
+              target="_blank"
+            >
+              Manage discount codes ↗
+            </s-link>
+          </s-list-item>
+          <s-list-item>
+            <s-link href="/app/billing">Plans & Billing</s-link>
           </s-list-item>
         </s-unordered-list>
-      </s-section>
-
-      <s-section slot="aside" heading="Store Info">
-        <s-stack direction="block" gap="small">
-          <s-text type="strong">{shop?.name}</s-text>
-          <s-text tone="info">{shop?.email}</s-text>
-          <s-text tone="info">{shop?.primaryDomain?.url}</s-text>
-        </s-stack>
       </s-section>
     </s-page>
   );

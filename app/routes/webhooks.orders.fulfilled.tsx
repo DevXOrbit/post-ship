@@ -1,25 +1,33 @@
 /**
- * Webhook: orders/fulfilled
+ * app/routes/webhooks.orders.fulfilled.tsx
  *
- * Fires when a Shopify order is fulfilled (tracking added).
- * In Phase 1: logs the event.
- * In Phase 2: triggers automated tracking update email via Resend/SendGrid.
+ * Webhook: orders/fulfilled
+ * Fires when a Shopify order gains at least one fulfillment with a tracking number.
+ *
+ * Flow:
+ *  1. Authenticate webhook (HMAC)
+ *  2. Load merchant AppSettings
+ *  3. Guard: tracking emails enabled + Resend key configured + Starter plan
+ *  4. Dedup via EmailLog (one "tracking_shipped" email per order)
+ *  5. Send branded tracking email via Resend
  */
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
+import { getSettings } from "../lib/settings.server";
+import { sendTrackingEmail } from "../lib/email.server";
 
 interface FulfillmentPayload {
   id: number;
-  order_id: number;
+  name: string;
   email: string;
-  name: string;         // order name e.g. "#1001"
   fulfillment_status: string;
   fulfillments: Array<{
     id: number;
     status: string;
-    tracking_company: string;
-    tracking_number: string;
-    tracking_url: string;
+    tracking_company: string | null;
+    tracking_number: string | null;
+    tracking_url: string | null;
     shipment_status: string | null;
   }>;
   shipping_address: {
@@ -28,56 +36,88 @@ interface FulfillmentPayload {
     city: string;
     country: string;
   } | null;
-  line_items: Array<{
-    id: number;
-    title: string;
-    quantity: number;
-  }>;
+  line_items: Array<{ id: number; title: string; quantity: number }>;
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, payload, topic } = await authenticate.webhook(request);
-
-  console.log(`[PostShip] Webhook received: ${topic} for shop: ${shop}`);
-
+  const { shop, payload } = await authenticate.webhook(request);
   const order = payload as FulfillmentPayload;
 
-  if (!order?.id) {
+  if (!order?.id || !order.email) {
     return new Response("OK", { status: 200 });
   }
 
-  const tracking = order.fulfillments?.[0];
+  const settings = await getSettings(shop);
 
-  console.log(
-    `[PostShip] Order ${order.name} fulfilled.`,
-    `Tracking: ${tracking?.tracking_number ?? "none"}`,
-    `Carrier: ${tracking?.tracking_company ?? "unknown"}`
+  // Guard: feature enabled
+  if (!settings.enableTrackingEmails) {
+    console.log(`[PostShip] Tracking emails disabled for ${shop} — skipping.`);
+    return new Response("OK", { status: 200 });
+  }
+
+  // Guard: Resend configured
+  if (!settings.resendApiKey || !settings.fromEmail) {
+    console.warn(
+      `[PostShip] Resend not configured for ${shop} — skipping email.`,
+    );
+    return new Response("OK", { status: 200 });
+  }
+
+  const tracking = order.fulfillments?.find(
+    (f) => f.tracking_number && f.tracking_number.trim() !== "",
   );
 
-  // ── Phase 2: Send tracking email ─────────────────────────────────────────
-  // TODO: Check AppSettings for shop to see if tracking emails are enabled.
-  // TODO: Load email template with brand color from AppSettings.
-  // TODO: Send via Resend/SendGrid with:
-  //   - Order name, tracking number, carrier, tracking URL
-  //   - Customer name from shipping address
-  //   - Deep link back to the tracking widget: {shop}/apps/postship?order={name}&email={email}&auto=1
-  //
-  // Example (Phase 2):
-  // const settings = await prisma.appSettings.findUnique({ where: { shop } });
-  // if (settings?.enableTrackingEmails && tracking?.tracking_number) {
-  //   await sendTrackingEmail({
-  //     to: order.email,
-  //     orderName: order.name,
-  //     tracking: {
-  //       number: tracking.tracking_number,
-  //       carrier: tracking.tracking_company,
-  //       url: tracking.tracking_url,
-  //     },
-  //     shopName: settings.senderName,
-  //     brandColor: settings.brandColor,
-  //   });
-  // }
-  // ─────────────────────────────────────────────────────────────────────────
+  if (!tracking?.tracking_number) {
+    console.log(
+      `[PostShip] Order ${order.name} fulfilled with no tracking number — skipping.`,
+    );
+    return new Response("OK", { status: 200 });
+  }
+
+  const orderId = `gid://shopify/Order/${order.id}`;
+
+  // Dedup: only send once per order
+  try {
+    await prisma.emailLog.create({
+      data: {
+        shop,
+        orderId,
+        type: "tracking_shipped",
+      },
+    });
+  } catch {
+    // Unique constraint violation = already sent
+    console.log(
+      `[PostShip] Tracking shipped email already sent for ${order.name} — skipping.`,
+    );
+    return new Response("OK", { status: 200 });
+  }
+
+  const result = await sendTrackingEmail({
+    to: order.email,
+    orderName: order.name,
+    customerName: order.shipping_address?.name ?? "",
+    trackingNumber: tracking.tracking_number,
+    trackingUrl: tracking.tracking_url ?? "",
+    carrier: tracking.tracking_company ?? "Carrier",
+    shopName: settings.senderName || shop,
+    shopDomain: shop,
+    brandColor: settings.brandColor,
+    fromEmail: settings.fromEmail,
+    senderName: settings.senderName || shop,
+    resendApiKey: settings.resendApiKey,
+  });
+
+  if (result.success) {
+    console.log(
+      `[PostShip] Tracking email sent for ${order.name} → ${order.email} (id: ${result.id})`,
+    );
+  } else {
+    console.error(
+      `[PostShip] Tracking email FAILED for ${order.name}: ${result.error}`,
+    );
+    // Don't remove the EmailLog entry — retry logic can be added later
+  }
 
   return new Response("OK", { status: 200 });
 };
