@@ -1,0 +1,53 @@
+{
+  "ratings": {
+    "stars": {
+      "label": "Ratings"
+    },
+    "home": {
+      "recommendationText": "Recommended Product!"
+    }
+  },
+  "postship": {
+    "loading": "Loading...",
+    "back": "← Back to lookup",
+    "tracking_info": "Tracking Information",
+    "carrier": "Carrier",
+    "tracking_number": "Tracking #",
+    "track_package": "Track Package",
+    "your_items": "Your Items",
+    "ship_to": "Shipping To",
+    "cancel_order": "Cancel Order",
+    "return_exchange": "Return / Exchange",
+    "get_help": "Get Help",
+    "chat_whatsapp": "Chat on WhatsApp",
+    "cancel_reason": "Reason for cancellation",
+    "cancel_reason_customer": "Changed my mind",
+    "cancel_reason_duplicate": "Ordered by mistake / duplicate",
+    "cancel_reason_shipping": "Shipping time too long",
+    "cancel_reason_price": "Found a better price",
+    "cancel_reason_other": "Other",
+    "please_specify": "Please specify",
+    "submit_cancel": "Submit Cancellation Request",
+    "request_type": "Request type",
+    "return": "Return",
+    "exchange": "Exchange",
+    "select_items": "Select items to return",
+    "return_reason": "Reason",
+    "reason_damaged": "Item arrived damaged",
+    "reason_wrong": "Wrong item received",
+    "reason_not_described": "Not as described",
+    "reason_not_needed": "No longer needed",
+    "reason_size": "Wrong size / fit",
+    "reason_other": "Other",
+    "additional_notes": "Additional notes (optional)",
+    "submit_request": "Submit Request",
+    "issue_type": "Issue type",
+    "issue_damaged": "Item arrived damaged",
+    "issue_missing": "Item missing from order",
+    "issue_wrong": "Wrong item received",
+    "issue_not_delivered": "Package not delivered",
+    "issue_other": "Other issue",
+    "describe_issue": "Describe the issue",
+    "submit_ticket": "Submit Support Ticket"
+  }
+}

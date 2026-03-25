@@ -1,0 +1,513 @@
+{%- comment -%}
+  PostShip — Order Tracking Block
+  Renders the full customer-facing order lookup + tracking experience.
+  Target: section (drag & drop in Theme Editor)
+{%- endcomment -%}
+
+<div
+  id="postship-tracking"
+  class="postship-wrap"
+  data-app-proxy="{{ shop.url }}/apps/postship"
+  data-locale="{{ request.locale.iso_code }}"
+  style="
+    --ps-brand: {{ block.settings.brand_color }};
+    --ps-text: {{ block.settings.text_color }};
+    --ps-bg: {{ block.settings.bg_color }};
+    --ps-radius: {{ block.settings.border_radius }}px;
+    font-family: {{ block.settings.font_family }};
+    position: relative;
+  "
+  {{ block.shopify_attributes }}
+>
+
+  {%- comment -%} ── LOOKUP FORM (shown first) ─────────────────────────── {%- endcomment -%}
+  <div id="ps-lookup" class="ps-card">
+    <div class="ps-card__header">
+      {%- if block.settings.show_icon -%}
+        <span class="ps-icon ps-icon--package" aria-hidden="true">
+          {%- render 'postship-icon', icon: 'package' -%}
+        </span>
+      {%- endif -%}
+      <h2 class="ps-heading">{{ block.settings.heading | default: 'Track Your Order' }}</h2>
+      {%- if block.settings.subheading != blank -%}
+        <p class="ps-subheading">{{ block.settings.subheading }}</p>
+      {%- endif -%}
+    </div>
+
+    <form id="ps-lookup-form" class="ps-form" novalidate>
+      <div class="ps-field">
+        <label class="ps-label" for="ps-order-number">
+          {{ block.settings.order_label | default: 'Order Number' }}
+        </label>
+        <input
+          id="ps-order-number"
+          class="ps-input"
+          type="text"
+          name="order_number"
+          placeholder="{{ block.settings.order_placeholder | default: '#1001' }}"
+          autocomplete="off"
+          required
+        />
+      </div>
+
+      <div class="ps-field">
+        <label class="ps-label" for="ps-email">
+          {{ block.settings.email_label | default: 'Email Address' }}
+        </label>
+        <input
+          id="ps-email"
+          class="ps-input"
+          type="email"
+          name="email"
+          placeholder="{{ block.settings.email_placeholder | default: 'you@example.com' }}"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div id="ps-lookup-error" class="ps-alert ps-alert--error" hidden></div>
+
+      <button
+        id="ps-lookup-btn"
+        class="ps-btn ps-btn--primary"
+        type="submit"
+      >
+        <span class="ps-btn__text">
+          {{ block.settings.button_text | default: 'Track Order' }}
+        </span>
+        <span class="ps-btn__spinner ps-spinner" hidden></span>
+      </button>
+    </form>
+  </div>
+
+  {%- comment -%} ── ORDER RESULT (shown after successful lookup) ────────── {%- endcomment -%}
+  <div id="ps-result" class="ps-card" hidden>
+
+    {%- comment -%} Back button {%- endcomment -%}
+    <button id="ps-back-btn" class="ps-btn ps-btn--ghost ps-back-btn" type="button">
+      ← {{ 'postship.back' | t: default: 'Back to lookup' }}
+    </button>
+
+    {%- comment -%} Order header {%- endcomment -%}
+    <div class="ps-order-header">
+      <div>
+        <h3 id="ps-order-name" class="ps-order-name"></h3>
+        <p id="ps-order-date" class="ps-order-meta"></p>
+      </div>
+      <div id="ps-fulfillment-badge" class="ps-badge"></div>
+    </div>
+
+    {%- comment -%} Tracking timeline {%- endcomment -%}
+    <div id="ps-tracking-section" class="ps-section" hidden>
+      <h4 class="ps-section__title">
+        {%- render 'postship-icon', icon: 'truck' -%}
+        {{ 'postship.tracking_info' | t: default: 'Tracking Information' }}
+      </h4>
+      <div class="ps-tracking-card">
+        <div class="ps-tracking-row">
+          <div class="ps-tracking-cell">
+            <span class="ps-label-sm">{{ 'postship.carrier' | t: default: 'Carrier' }}</span>
+            <strong id="ps-carrier"></strong>
+          </div>
+          <div class="ps-tracking-cell">
+            <span class="ps-label-sm">{{ 'postship.tracking_number' | t: default: 'Tracking #' }}</span>
+            <strong id="ps-tracking-number"></strong>
+          </div>
+        </div>
+        <a id="ps-track-link" class="ps-btn ps-btn--secondary" target="_blank" rel="noopener" hidden>
+          {%- render 'postship-icon', icon: 'external' -%}
+          {{ 'postship.track_package' | t: default: 'Track Package' }}
+        </a>
+      </div>
+    </div>
+
+    {%- comment -%} Order items {%- endcomment -%}
+    <div class="ps-section">
+      <h4 class="ps-section__title">
+        {%- render 'postship-icon', icon: 'bag' -%}
+        {{ 'postship.your_items' | t: default: 'Your Items' }}
+      </h4>
+      <div id="ps-items-list" class="ps-items"></div>
+    </div>
+
+    {%- comment -%} Shipping address {%- endcomment -%}
+    <div id="ps-address-section" class="ps-section" hidden>
+      <h4 class="ps-section__title">
+        {%- render 'postship-icon', icon: 'pin' -%}
+        {{ 'postship.ship_to' | t: default: 'Shipping To' }}
+      </h4>
+      <address id="ps-address" class="ps-address"></address>
+    </div>
+
+    {%- comment -%} ── TABS: Cancel / Return / Support ─────────────────── {%- endcomment -%}
+    <div class="ps-actions-tabs">
+      <div class="ps-tabs" role="tablist">
+        {%- if block.settings.show_cancel -%}
+          <button
+            class="ps-tab"
+            role="tab"
+            data-tab="cancel"
+            aria-selected="false"
+            id="ps-tab-cancel"
+          >
+            {%- render 'postship-icon', icon: 'x-circle' -%}
+            {{ 'postship.cancel_order' | t: default: 'Cancel Order' }}
+          </button>
+        {%- endif -%}
+        {%- if block.settings.show_returns -%}
+          <button
+            class="ps-tab"
+            role="tab"
+            data-tab="return"
+            aria-selected="false"
+            id="ps-tab-return"
+          >
+            {%- render 'postship-icon', icon: 'return' -%}
+            {{ 'postship.return_exchange' | t: default: 'Return / Exchange' }}
+          </button>
+        {%- endif -%}
+        {%- if block.settings.show_support -%}
+          <button
+            class="ps-tab"
+            role="tab"
+            data-tab="support"
+            aria-selected="false"
+            id="ps-tab-support"
+          >
+            {%- render 'postship-icon', icon: 'help' -%}
+            {{ 'postship.get_help' | t: default: 'Get Help' }}
+          </button>
+        {%- endif -%}
+        {%- if block.settings.whatsapp_number != blank -%}
+          <a
+            id="ps-whatsapp-btn"
+            class="ps-tab ps-tab--whatsapp"
+            target="_blank"
+            rel="noopener"
+          >
+            {%- render 'postship-icon', icon: 'whatsapp' -%}
+            {{ 'postship.chat_whatsapp' | t: default: 'Chat on WhatsApp' }}
+          </a>
+        {%- endif -%}
+      </div>
+
+      {%- comment -%} Cancel panel {%- endcomment -%}
+      {%- if block.settings.show_cancel -%}
+        <div id="ps-panel-cancel" class="ps-tab-panel" role="tabpanel" hidden>
+          <div id="ps-cancel-allowed">
+            <p class="ps-info-text">
+              {{ block.settings.cancel_help_text  }}
+            </p>
+            <form id="ps-cancel-form" class="ps-form ps-form--compact">
+              <div class="ps-field">
+                <label class="ps-label" for="ps-cancel-reason">
+                  {{ 'postship.cancel_reason' | t: default: 'Reason for cancellation' }}
+                </label>
+                <select id="ps-cancel-reason" name="reason" class="ps-select">
+                  <option value="customer">{{ 'postship.cancel_reason_customer' | t: default: 'Changed my mind' }}</option>
+                  <option value="duplicate">{{ 'postship.cancel_reason_duplicate' | t: default: 'Ordered by mistake / duplicate' }}</option>
+                  <option value="shipping">{{ 'postship.cancel_reason_shipping' | t: default: 'Shipping time too long' }}</option>
+                  <option value="price">{{ 'postship.cancel_reason_price' | t: default: 'Found a better price' }}</option>
+                  <option value="other">{{ 'postship.cancel_reason_other' | t: default: 'Other' }}</option>
+                </select>
+              </div>
+              <div class="ps-field" id="ps-cancel-other-wrap" hidden>
+                <label class="ps-label" for="ps-cancel-other">
+                  {{ 'postship.please_specify' | t: default: 'Please specify' }}
+                </label>
+                <textarea id="ps-cancel-other" name="notes" class="ps-textarea" rows="2"></textarea>
+              </div>
+              <div id="ps-cancel-msg" class="ps-alert" hidden></div>
+              <button class="ps-btn ps-btn--danger" type="submit">
+                {{ 'postship.submit_cancel' | t: default: 'Submit Cancellation Request' }}
+              </button>
+            </form>
+          </div>
+          <div id="ps-cancel-blocked" class="ps-info-box" hidden>
+            <p>{{ block.settings.cancel_blocked_text | default: 'This order can no longer be cancelled as it has already been fulfilled or is outside the cancellation window.' }}</p>
+          </div>
+        </div>
+      {%- endif -%}
+
+      {%- comment -%} Return/Exchange panel {%- endcomment -%}
+      {%- if block.settings.show_returns -%}
+        <div id="ps-panel-return" class="ps-tab-panel" role="tabpanel" hidden>
+          <p class="ps-info-text">
+            {{ block.settings.return_help_text  }}
+          </p>
+          <form id="ps-return-form" class="ps-form ps-form--compact">
+            <div class="ps-field">
+              <label class="ps-label">
+                {{ 'postship.request_type' | t: default: 'Request type' }}
+              </label>
+              <div class="ps-radio-group">
+                <label class="ps-radio-label">
+                  <input type="radio" name="return_type" value="return" checked />
+                  {{ 'postship.return' | t: default: 'Return' }}
+                </label>
+                <label class="ps-radio-label">
+                  <input type="radio" name="return_type" value="exchange" />
+                  {{ 'postship.exchange' | t: default: 'Exchange' }}
+                </label>
+              </div>
+            </div>
+            <div id="ps-return-items" class="ps-field">
+              <label class="ps-label">
+                {{ 'postship.select_items' | t: default: 'Select items to return' }}
+              </label>
+              <div id="ps-return-items-list" class="ps-items-checklist"></div>
+            </div>
+            <div class="ps-field">
+              <label class="ps-label" for="ps-return-reason">
+                {{ 'postship.return_reason' | t: default: 'Reason' }}
+              </label>
+              <select id="ps-return-reason" name="reason" class="ps-select">
+                <option value="damaged">{{ 'postship.reason_damaged' | t: default: 'Item arrived damaged' }}</option>
+                <option value="wrong_item">{{ 'postship.reason_wrong' | t: default: 'Wrong item received' }}</option>
+                <option value="not_as_described">{{ 'postship.reason_not_described' | t: default: 'Not as described' }}</option>
+                <option value="no_longer_needed">{{ 'postship.reason_not_needed' | t: default: 'No longer needed' }}</option>
+                <option value="size_fit">{{ 'postship.reason_size' | t: default: 'Wrong size / fit' }}</option>
+                <option value="other">{{ 'postship.reason_other' | t: default: 'Other' }}</option>
+              </select>
+            </div>
+            <div class="ps-field">
+              <label class="ps-label" for="ps-return-notes">
+                {{ 'postship.additional_notes' | t: default: 'Additional notes (optional)' }}
+              </label>
+              <textarea id="ps-return-notes" name="notes" class="ps-textarea" rows="3"></textarea>
+            </div>
+            <div id="ps-return-msg" class="ps-alert" hidden></div>
+            <button class="ps-btn ps-btn--primary" type="submit">
+              {{ 'postship.submit_request' | t: default: 'Submit Request' }}
+            </button>
+          </form>
+        </div>
+      {%- endif -%}
+
+      {%- comment -%} Support panel {%- endcomment -%}
+      {%- if block.settings.show_support -%}
+        <div id="ps-panel-support" class="ps-tab-panel" role="tabpanel" hidden>
+          <p class="ps-info-text">
+            {{ block.settings.support_help_text  }}
+          </p>
+          <form id="ps-support-form" class="ps-form ps-form--compact">
+            <div class="ps-field">
+              <label class="ps-label" for="ps-issue-type">
+                {{ 'postship.issue_type' | t: default: 'Issue type' }}
+              </label>
+              <select id="ps-issue-type" name="issue_type" class="ps-select">
+                <option value="damaged">{{ 'postship.issue_damaged' | t: default: 'Item arrived damaged' }}</option>
+                <option value="missing">{{ 'postship.issue_missing' | t: default: 'Item missing from order' }}</option>
+                <option value="wrong_item">{{ 'postship.issue_wrong' | t: default: 'Wrong item received' }}</option>
+                <option value="not_delivered">{{ 'postship.issue_not_delivered' | t: default: 'Package not delivered' }}</option>
+                <option value="other">{{ 'postship.issue_other' | t: default: 'Other issue' }}</option>
+              </select>
+            </div>
+            <div class="ps-field">
+              <label class="ps-label" for="ps-issue-desc">
+                {{ 'postship.describe_issue' | t: default: 'Describe the issue' }}
+              </label>
+              <textarea
+                id="ps-issue-desc"
+                name="description"
+                class="ps-textarea"
+                rows="4"
+                required
+              ></textarea>
+            </div>
+            <div id="ps-support-msg" class="ps-alert" hidden></div>
+            <button class="ps-btn ps-btn--primary" type="submit">
+              {{ 'postship.submit_ticket' | t: default: 'Submit Support Ticket' }}
+            </button>
+          </form>
+        </div>
+      {%- endif -%}
+    </div>{%- comment -%} /.ps-actions-tabs {%- endcomment -%}
+
+  </div>{%- comment -%} /#ps-result {%- endcomment -%}
+
+  {%- comment -%} ── Loading overlay ─────────────────────────────────────── {%- endcomment -%}
+  <div id="ps-loading" class="ps-loading-overlay" hidden aria-live="polite">
+    <span class="ps-spinner ps-spinner--lg" role="status">
+      <span class="ps-sr-only">{{ 'postship.loading' | t: default: 'Loading...' }}</span>
+    </span>
+  </div>
+
+</div>
+
+{%- comment -%} Pass settings to JS as JSON ─────────────────────────────── {%- endcomment -%}
+<script>
+  window.__postshipConfig = {
+    appProxy: {{ shop.url | append: '/apps/postship' | json }},
+    locale: {{ request.locale.iso_code | json }},
+    showCancel: {{ block.settings.show_cancel | json }},
+    showReturns: {{ block.settings.show_returns | json }},
+    showSupport: {{ block.settings.show_support | json }},
+    whatsappNumber: {{ block.settings.whatsapp_number | json }},
+    cancelWindowHours: {{ block.settings.cancel_window_hours | json }},
+  };
+</script>
+<script src="{{ 'postship-tracking.js' | asset_url }}" defer></script>
+{% schema %}
+{
+  "name": "PostShip — Order Tracking",
+  "target": "section",
+  
+  "stylesheet": "postship-tracking.css",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Track Your Order"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Enter your order number and email to see your order status and tracking information."
+    },
+    {
+      "type": "text",
+      "id": "order_label",
+      "label": "Order number label",
+      "default": "Order Number"
+    },
+    {
+      "type": "text",
+      "id": "order_placeholder",
+      "label": "Order number placeholder",
+      "default": "#1001"
+    },
+    {
+      "type": "text",
+      "id": "email_label",
+      "label": "Email label",
+      "default": "Email Address"
+    },
+    {
+      "type": "text",
+      "id": "email_placeholder",
+      "label": "Email placeholder",
+      "default": "you@example.com"
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Button text",
+      "default": "Track Order"
+    },
+    {
+      "type": "header",
+      "content": "Features"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_icon",
+      "label": "Show header icon",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_cancel",
+      "label": "Show cancel request tab",
+      "default": true
+    },
+    {
+      "type": "number",
+      "id": "cancel_window_hours",
+      "label": "Cancellation window (hours)",
+      "default": 2
+    },
+    {
+      "type": "textarea",
+      "id": "cancel_help_text",
+      "label": "Cancel tab help text",
+      "default": "You can request cancellation within the allowed window. We'll process your request as soon as possible."
+    },
+    {
+      "type": "textarea",
+      "id": "cancel_blocked_text",
+      "label": "Cancel blocked message",
+      "default": "This order can no longer be cancelled as it has already been fulfilled or is outside the cancellation window."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_returns",
+      "label": "Show return/exchange tab",
+      "default": true
+    },
+    {
+      "type": "textarea",
+      "id": "return_help_text",
+      "label": "Return tab help text",
+      "default": "Select the items you'd like to return or exchange and provide a reason."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_support",
+      "label": "Show support ticket tab",
+      "default": true
+    },
+    {
+      "type": "textarea",
+      "id": "support_help_text",
+      "label": "Support tab help text",
+      "default": "Having an issue with your order? Let us know and we'll get it sorted."
+    },
+    {
+      "type": "text",
+      "id": "whatsapp_number",
+      "label": "WhatsApp number (optional)",
+      "info": "Include country code, e.g. +1234567890. Leave blank to hide the WhatsApp button."
+    },
+    {
+      "type": "header",
+      "content": "Design"
+    },
+    {
+      "type": "color",
+      "id": "brand_color",
+      "label": "Brand color",
+      "default": "#5c6ac4"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "Background color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "Border radius",
+      "min": 0,
+      "max": 24,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "select",
+      "id": "font_family",
+      "label": "Font",
+      "options": [
+        { "value": "inherit", "label": "Theme default" },
+        { "value": "-apple-system, BlinkMacSystemFont, 'Segoe UI'", "label": "System UI" },
+        { "value": "Georgia, serif", "label": "Georgia (Serif)" }
+      ],
+      "default": "inherit"
+    }
+  ]
+}
+{% endschema %}

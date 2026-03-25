@@ -1,0 +1,136 @@
+{%- comment -%}
+  PostShip — Floating Tracker Embed Block
+  Injects a floating "Track my order" button into every page.
+  Merchants enable this from Theme Settings → App embeds.
+  Target: body (app embed block)
+{%- endcomment -%}
+
+{%- if block.settings.show_floating_button -%}
+<div
+  id="postship-float"
+  class="ps-float"
+  style="
+    --ps-float-brand: {{ block.settings.float_color }};
+    --ps-float-pos-bottom: {{ block.settings.position_bottom }}px;
+    --ps-float-pos-side: {{ block.settings.position_side }}px;
+    --ps-float-side: {{ block.settings.float_side }};
+  "
+>
+  <a
+    href="{{ block.settings.tracking_page_url | default: '/pages/track-your-order' }}"
+    class="ps-float__btn"
+    aria-label="{{ block.settings.button_label | default: 'Track my order' }}"
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+      <rect x="1" y="3" width="15" height="13"/>
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+      <circle cx="5.5" cy="18.5" r="2.5"/>
+      <circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+    <span class="ps-float__label">{{ block.settings.button_label | default: 'Track my order' }}</span>
+  </a>
+</div>
+
+<style>
+  .ps-float {
+    position: fixed;
+    bottom: var(--ps-float-pos-bottom, 24px);
+    {{ block.settings.float_side }}: var(--ps-float-pos-side, 24px);
+    z-index: 9999;
+  }
+
+  .ps-float__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--ps-float-brand, #5c6ac4);
+    color: #fff;
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+
+  .ps-float__btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    filter: brightness(1.08);
+  }
+
+  .ps-float__btn:active {
+    transform: scale(0.97);
+  }
+
+  @media (max-width: 480px) {
+    .ps-float__label { display: none; }
+    .ps-float__btn { padding: 14px; border-radius: 50%; }
+  }
+</style>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "PostShip Floating Button",
+  "target": "body",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_floating_button",
+      "label": "Show floating 'Track my order' button",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Track my order"
+    },
+    {
+      "type": "url",
+      "id": "tracking_page_url",
+      "label": "Tracking page URL",
+      "info": "Link to the page where you've added the PostShip tracking block. e.g. /pages/track-your-order"
+    },
+    {
+      "type": "color",
+      "id": "float_color",
+      "label": "Button color",
+      "default": "#5c6ac4"
+    },
+    {
+      "type": "select",
+      "id": "float_side",
+      "label": "Button position",
+      "options": [
+        { "value": "right", "label": "Bottom right" },
+        { "value": "left",  "label": "Bottom left" }
+      ],
+      "default": "right"
+    },
+    {
+      "type": "range",
+      "id": "position_bottom",
+      "label": "Distance from bottom",
+      "min": 12,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "position_side",
+      "label": "Distance from side",
+      "min": 12,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

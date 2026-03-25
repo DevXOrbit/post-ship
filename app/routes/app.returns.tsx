@@ -1,4 +1,8 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs, HeadersFunction } from "react-router";
+import type {
+  LoaderFunctionArgs,
+  ActionFunctionArgs,
+  HeadersFunction,
+} from "react-router";
 import { useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -9,11 +13,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const returns = await prisma.returnRequest.findMany({
-    where: { shop },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  }).catch(() => []);
+  const returns = await prisma.returnRequest
+    .findMany({
+      where: { shop },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    })
+    .catch(() => []);
 
   return { returns };
 };
@@ -28,10 +34,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "update-status") {
     const status = formData.get("status") as string;
-    await prisma.returnRequest.update({
-      where: { id, shop },
-      data: { status },
-    }).catch(() => null);
+    await prisma.returnRequest
+      .update({
+        where: { id, shop },
+        data: { status },
+      })
+      .catch(() => null);
     return { success: true };
   }
 
@@ -48,7 +56,9 @@ type ReturnRequest = {
   createdAt: Date;
 };
 
-function getStatusTone(status: string): "success" | "warning" | "info" | "critical" | undefined {
+function getStatusTone(
+  status: string,
+): "success" | "warning" | "info" | "critical" | undefined {
   const map: Record<string, "success" | "warning" | "info" | "critical"> = {
     pending: "warning",
     approved: "success",
@@ -59,14 +69,13 @@ function getStatusTone(status: string): "success" | "warning" | "info" | "critic
 }
 
 export default function ReturnsPage() {
-  const { returns } = useLoaderData<typeof loader>() as { returns: ReturnRequest[] };
+  const { returns } = useLoaderData<typeof loader>() as {
+    returns: ReturnRequest[];
+  };
   const fetcher = useFetcher();
 
   const handleStatusChange = (id: string, status: string) => {
-    fetcher.submit(
-      { intent: "update-status", id, status },
-      { method: "post" }
-    );
+    fetcher.submit({ intent: "update-status", id, status }, { method: "post" });
   };
 
   return (
@@ -81,8 +90,8 @@ export default function ReturnsPage() {
             <s-icon name="return" />
             <s-heading>No return requests yet</s-heading>
             <s-paragraph>
-              When customers submit return or exchange requests, they'll appear here.
-              Return requests are available on the Starter plan and above.
+              When customers submit return or exchange requests, they'll appear
+              here. Return requests are available on the Starter plan and above.
             </s-paragraph>
             <s-button href="/app/billing">Upgrade to Starter</s-button>
           </s-stack>
@@ -157,9 +166,15 @@ export default function ReturnsPage() {
           <s-text fontWeight="semibold">Statuses:</s-text>
         </s-paragraph>
         <s-unordered-list>
-          <s-list-item><s-badge tone="warning">Pending</s-badge> — Awaiting review</s-list-item>
-          <s-list-item><s-badge tone="success">Approved</s-badge> — Return approved</s-list-item>
-          <s-list-item><s-badge tone="critical">Rejected</s-badge> — Return declined</s-list-item>
+          <s-list-item>
+            <s-badge tone="warning">Pending</s-badge> — Awaiting review
+          </s-list-item>
+          <s-list-item>
+            <s-badge tone="success">Approved</s-badge> — Return approved
+          </s-list-item>
+          <s-list-item>
+            <s-badge tone="critical">Rejected</s-badge> — Return declined
+          </s-list-item>
         </s-unordered-list>
       </s-section>
     </s-page>
