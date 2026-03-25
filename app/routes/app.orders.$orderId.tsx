@@ -266,14 +266,14 @@ export default function OrderDetail() {
       {/* Status row */}
       <s-section>
         <s-stack direction="inline" gap="base">
-          <s-stack direction="block" gap="tight">
-            <s-text tone="subdued">Fulfillment Status</s-text>
+          <s-stack direction="block" gap="small">
+            <s-text tone="info">Fulfillment Status</s-text>
             <s-badge tone={getFulfillmentTone(order.displayFulfillmentStatus)}>
               {formatStatus(order.displayFulfillmentStatus)}
             </s-badge>
           </s-stack>
-          <s-stack direction="block" gap="tight">
-            <s-text tone="subdued">Payment Status</s-text>
+          <s-stack direction="block" gap="small">
+            <s-text tone="info">Payment Status</s-text>
             <s-badge
               tone={
                 order.displayFinancialStatus === "PAID" ? "success" : "warning"
@@ -282,8 +282,8 @@ export default function OrderDetail() {
               {formatStatus(order.displayFinancialStatus)}
             </s-badge>
           </s-stack>
-          <s-stack direction="block" gap="tight">
-            <s-text tone="subdued">Order Date</s-text>
+          <s-stack direction="block" gap="small">
+            <s-text tone="info">Order Date</s-text>
             <s-text>{formatDate(order.createdAt)}</s-text>
           </s-stack>
         </s-stack>
@@ -293,19 +293,19 @@ export default function OrderDetail() {
       {tracking ? (
         <s-section heading="Tracking Information">
           <s-stack direction="block" gap="base">
-            <s-stack direction="inline" gap="loose">
-              <s-stack direction="block" gap="tight">
-                <s-text tone="subdued">Carrier</s-text>
-                <s-text fontWeight="semibold">
+            <s-stack direction="inline" gap="small">
+              <s-stack direction="block" gap="small">
+                <s-text tone="info">Carrier</s-text>
+                <s-text type="strong">
                   {primary?.trackingCompany || tracking.company || "Unknown"}
                 </s-text>
               </s-stack>
-              <s-stack direction="block" gap="tight">
-                <s-text tone="subdued">Tracking Number</s-text>
-                <s-text fontWeight="semibold">{tracking.number}</s-text>
+              <s-stack direction="block" gap="small">
+                <s-text tone="info">Tracking Number</s-text>
+                <s-text type="strong">{tracking.number}</s-text>
               </s-stack>
-              <s-stack direction="block" gap="tight">
-                <s-text tone="subdued">Status</s-text>
+              <s-stack direction="block" gap="small">
+                <s-text tone="info">Status</s-text>
                 <s-badge tone={getFulfillmentTone(primary?.status ?? "")}>
                   {formatStatus(primary?.status ?? "Unknown")}
                 </s-badge>
@@ -331,16 +331,16 @@ export default function OrderDetail() {
       <s-section heading="Order Items">
         <s-table>
           <s-table-header-row>
-            <s-table-header-cell>Product</s-table-header-cell>
-            <s-table-header-cell>SKU</s-table-header-cell>
-            <s-table-header-cell>Qty</s-table-header-cell>
-            <s-table-header-cell>Price</s-table-header-cell>
+            <s-table-header>Product</s-table-header>
+            <s-table-header>SKU</s-table-header>
+            <s-table-header>Qty</s-table-header>
+            <s-table-header>Price</s-table-header>
           </s-table-header-row>
           <s-table-body>
             {order.lineItems.edges.map(({ node: item }) => (
               <s-table-row key={item.id}>
                 <s-table-cell>
-                  <s-stack direction="inline" gap="tight" align="center">
+                  <s-stack direction="inline" gap="small" align="center">
                     {item.variant?.image && (
                       <s-thumbnail
                         src={item.variant.image.url}
@@ -352,7 +352,7 @@ export default function OrderDetail() {
                   </s-stack>
                 </s-table-cell>
                 <s-table-cell>
-                  <s-text tone="subdued">{item.sku || "—"}</s-text>
+                  <s-text tone="info">{item.sku || "—"}</s-text>
                 </s-table-cell>
                 <s-table-cell>{item.quantity}</s-table-cell>
                 <s-table-cell>
@@ -365,23 +365,23 @@ export default function OrderDetail() {
 
         {/* Order totals */}
         <s-divider />
-        <s-stack direction="block" gap="tight">
-          <s-stack direction="inline" gap="loose">
-            <s-text tone="subdued">Subtotal</s-text>
+        <s-stack direction="block" gap="small">
+          <s-stack direction="inline" gap="small">
+            <s-text tone="info">Subtotal</s-text>
             <s-text>{fmt(order.subtotalPriceSet.shopMoney.amount)}</s-text>
           </s-stack>
-          <s-stack direction="inline" gap="loose">
-            <s-text tone="subdued">Shipping</s-text>
+          <s-stack direction="inline" gap="small">
+            <s-text tone="info">Shipping</s-text>
             <s-text>{fmt(order.totalShippingPriceSet.shopMoney.amount)}</s-text>
           </s-stack>
-          <s-stack direction="inline" gap="loose">
-            <s-text tone="subdued">Tax</s-text>
+          <s-stack direction="inline" gap="small">
+            <s-text tone="info">Tax</s-text>
             <s-text>{fmt(order.totalTaxSet.shopMoney.amount)}</s-text>
           </s-stack>
           <s-divider />
-          <s-stack direction="inline" gap="loose">
-            <s-text fontWeight="semibold">Total</s-text>
-            <s-text fontWeight="semibold">
+          <s-stack direction="inline" gap="small">
+            <s-text type="strong">Total</s-text>
+            <s-text type="strong">
               {fmt(order.totalPriceSet.shopMoney.amount)}
             </s-text>
           </s-stack>
@@ -419,8 +419,8 @@ export default function OrderDetail() {
       {/* Aside: shipping address */}
       <s-section slot="aside" heading="Ship To">
         {order.shippingAddress ? (
-          <s-stack direction="block" gap="tight">
-            <s-text fontWeight="semibold">{order.shippingAddress.name}</s-text>
+          <s-stack direction="block" gap="small">
+            <s-text type="strong">{order.shippingAddress.name}</s-text>
             <s-text>{order.shippingAddress.address1}</s-text>
             {order.shippingAddress.address2 && (
               <s-text>{order.shippingAddress.address2}</s-text>
@@ -431,19 +431,19 @@ export default function OrderDetail() {
             </s-text>
             <s-text>{order.shippingAddress.country}</s-text>
             {order.shippingAddress.phone && (
-              <s-text tone="subdued">{order.shippingAddress.phone}</s-text>
+              <s-text tone="info">{order.shippingAddress.phone}</s-text>
             )}
           </s-stack>
         ) : (
-          <s-text tone="subdued">No shipping address</s-text>
+          <s-text tone="info">No shipping address</s-text>
         )}
       </s-section>
 
       {/* Aside: customer info */}
       <s-section slot="aside" heading="Customer">
-        <s-stack direction="block" gap="tight">
-          <s-text fontWeight="semibold">{order.email ?? "—"}</s-text>
-          {order.phone && <s-text tone="subdued">{order.phone}</s-text>}
+        <s-stack direction="block" gap="small">
+          <s-text type="strong">{order.email ?? "—"}</s-text>
+          {order.phone && <s-text tone="info">{order.phone}</s-text>}
         </s-stack>
       </s-section>
 
@@ -457,7 +457,7 @@ export default function OrderDetail() {
       {/* Aside: tags */}
       {order.tags?.length > 0 && (
         <s-section slot="aside" heading="Tags">
-          <s-stack direction="inline" gap="tight">
+          <s-stack direction="inline" gap="small">
             {order.tags.map((tag) => (
               <s-chip key={tag}>{tag}</s-chip>
             ))}

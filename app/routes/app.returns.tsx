@@ -86,12 +86,15 @@ export default function ReturnsPage() {
 
       {returns.length === 0 ? (
         <s-section>
-          <s-stack direction="block" align="center" gap="base">
-            <s-icon name="return" />
-            <s-heading>No return requests yet</s-heading>
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" gap="base">
+              <s-icon type="return" />
+              <s-heading>No return requests yet</s-heading>
+            </s-stack>
             <s-paragraph>
-              When customers submit return or exchange requests, they'll appear
-              here. Return requests are available on the Starter plan and above.
+              When customers submit return or exchange requests, they&apos;ll
+              appear here. Return requests are available on the Starter plan and
+              above.
             </s-paragraph>
             <s-button href="/app/billing">Upgrade to Starter</s-button>
           </s-stack>
@@ -100,13 +103,13 @@ export default function ReturnsPage() {
         <s-section heading="Return Requests">
           <s-table>
             <s-table-header-row>
-              <s-table-header-cell>Order</s-table-header-cell>
-              <s-table-header-cell>Customer</s-table-header-cell>
-              <s-table-header-cell>Items</s-table-header-cell>
-              <s-table-header-cell>Reason</s-table-header-cell>
-              <s-table-header-cell>Status</s-table-header-cell>
-              <s-table-header-cell>Date</s-table-header-cell>
-              <s-table-header-cell>Actions</s-table-header-cell>
+              <s-table-header>Order</s-table-header>
+              <s-table-header>Customer</s-table-header>
+              <s-table-header>Items</s-table-header>
+              <s-table-header>Reason</s-table-header>
+              <s-table-header>Status</s-table-header>
+              <s-table-header>Date</s-table-header>
+              <s-table-header>Actions</s-table-header>
             </s-table-header-row>
             <s-table-body>
               {returns.map((r) => (
@@ -129,7 +132,7 @@ export default function ReturnsPage() {
                         <>
                           <s-button
                             variant="secondary"
-                            tone="success"
+                            tone="auto"
                             onClick={() => handleStatusChange(r.id, "approved")}
                           >
                             Approve
@@ -144,7 +147,7 @@ export default function ReturnsPage() {
                         </>
                       )}
                       {r.status !== "pending" && (
-                        <s-text tone="subdued">
+                        <s-text tone="info">
                           {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                         </s-text>
                       )}
@@ -159,11 +162,12 @@ export default function ReturnsPage() {
 
       <s-section slot="aside" heading="About Returns">
         <s-paragraph>
-          Customers can submit return and exchange requests from your store's
-          tracking page. You'll receive email notifications for new requests.
+          Customers can submit return and exchange requests from your
+          store&apos;s tracking page. You&apos;ll receive email notifications
+          for new requests.
         </s-paragraph>
         <s-paragraph>
-          <s-text fontWeight="semibold">Statuses:</s-text>
+          <s-text type="strong">Statuses:</s-text>
         </s-paragraph>
         <s-unordered-list>
           <s-list-item>
