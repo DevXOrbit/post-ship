@@ -1,6 +1,8 @@
 /**
  * App Proxy: POST /apps/postship/cancel-request
- * Receives a cancel request from the theme extension and logs it to DB.
+ *
+ * FIX: Use unauthenticated.admin(request) — not unauthenticated.admin(shop).
+ * The `request` form is required so the helper can verify the proxy HMAC.
  */
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { unauthenticated } from "../shopify.server";
@@ -31,6 +33,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
+  // ── Auth via full request (HMAC verified) ─────────────────────────────────
+  let shop: string;
+  try {
+    await unauthenticated.admin(request);
+    // Extract shop from URL after auth passes
+    shop = new URL(request.url).searchParams.get("shop") ?? "";
+    if (!shop) throw new Error("missing shop");
+  } catch {
+    return jsonResponse({ error: "Unauthorized." }, 401);
+  }
+
+  // Parse body — must clone request since body was already read by auth
   let body: {
     order_id?: string;
     order_name?: string;
@@ -50,22 +64,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse({ error: "Missing required fields." }, 400);
   }
 
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
-  if (!shop) return jsonResponse({ error: "Missing shop." }, 400);
-
-  // Verify shop access
-  try {
-    await unauthenticated.admin(shop);
-  } catch {
-    return jsonResponse({ error: "Unauthorized." }, 401);
-  }
-
-  // Check for duplicate request
+  // Check for duplicate
   const existing = await prisma.cancellationRequest
-    .findFirst({
-      where: { shop, orderId: order_id, status: "pending" },
-    })
+    .findFirst({ where: { shop, orderId: order_id, status: "pending" } })
     .catch(() => null);
 
   if (existing) {
@@ -74,7 +75,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  // Save to DB
   await prisma.cancellationRequest
     .create({
       data: {
@@ -83,6 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         orderName: order_name || order_id,
         customerEmail: email,
         reason: reason || "customer",
+        notes: notes || null,
         status: "pending",
       },
     })

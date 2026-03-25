@@ -9,7 +9,7 @@
   },
   "postship": {
     "loading": "Loading...",
-    "back": "← Back to lookup",
+    "back": "Back to lookup",
     "tracking_info": "Tracking Information",
     "carrier": "Carrier",
     "tracking_number": "Tracking #",

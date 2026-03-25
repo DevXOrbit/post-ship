@@ -1,23 +1,6 @@
-/**
- * App Proxy entry point.
- *
- * React Router flat-file routing maps:
- *   /proxy                  → proxy._index.tsx   (this file)
- *   /proxy/order-lookup     → proxy.order-lookup.tsx
- *   /proxy/cancel-request   → proxy.cancel-request.tsx
- *   /proxy/return-request   → proxy.return-request.tsx
- *   /proxy/support-ticket   → proxy.support-ticket.tsx
- *
- * The Shopify App Proxy forwards {shop}/apps/postship/* → {appUrl}/proxy/*
- * and appends ?shop=... + HMAC params. The `unauthenticated.admin()` helper
- * verifies those automatically.
- *
- * This root file just serves a health-check and CORS preflight for the prefix.
- */
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -37,6 +20,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
       },
-    }
+    },
   );
 };

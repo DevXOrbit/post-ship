@@ -618,6 +618,18 @@
   border: 0;
 }
 
+.postship-wrap [hidden],
+.postship-wrap .ps-hidden {
+  display: none !important;
+}
+
+.postship-wrap #ps-loading[hidden],
+.postship-wrap #ps-loading.ps-hidden {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .ps-tracking-row {
@@ -641,4 +653,8 @@
     flex-direction: column;
     gap: 8px;
   }
+}
+
+.postship-tracking {
+  margin: 0 auto;
 }

@@ -2,13 +2,47 @@
  * App Proxy: POST /apps/postship/order-lookup
  *
  * Validates customer email against order, returns safe order data.
- * This route is hit by the theme extension JS via the Shopify App Proxy.
- * Shopify verifies the HMAC signature automatically via the unauthenticated helper.
+ *
+ * ── GraphQL corrections (per https://shopify.dev/docs/api/admin-graphql/latest/queries/orders) ──
+ *
+ * 1. lineItems: use `name` not `title` — `name` includes variant (e.g. "Blue T-Shirt - Large")
+ * 2. lineItems: use `originalUnitPriceSet` for price, NOT `variant.price`
+ * 3. lineItems: image is `image { url }` directly on the lineItem node, NOT via variant
+ * 4. fulfillments: plain ARRAY — no `(first: N)` argument (it's not a connection)
+ * 5. shippingAddress: `province` doesn't exist — correct field is `provinceCode`
+ * 6. displayFinancialStatus / displayFulfillmentStatus return UPPERCASE enums
+ *    → normalize to lowercase in the response shape for the JS statusClass() map
+ * 7. Auth: unauthenticated.admin(request) — full Request for HMAC verification
  */
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { unauthenticated } from "../shopify.server";
 
 // ── Types ──────────────────────────────────────────────────────────────────
+interface GQLLineItem {
+  id: string;
+  name: string;
+  quantity: number;
+  sku: string | null;
+  image: { url: string } | null;
+  originalUnitPriceSet: {
+    shopMoney: { amount: string; currencyCode: string };
+  };
+  variant: {
+    id: string;
+    title: string;
+  } | null;
+}
+
+interface GQLFulfillment {
+  status: string;
+  trackingCompany: string | null;
+  trackingInfo: Array<{
+    number: string | null;
+    url: string | null;
+    company: string | null;
+  }>;
+}
+
 interface GQLOrder {
   id: string;
   name: string;
@@ -18,35 +52,18 @@ interface GQLOrder {
   displayFulfillmentStatus: string;
   displayFinancialStatus: string;
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
-  lineItems: {
-    edges: Array<{
-      node: {
-        id: string;
-        title: string;
-        quantity: number;
-        variant: {
-          id: string;
-          title: string;
-          price: string;
-          image: { url: string } | null;
-        } | null;
-      };
-    }>;
-  };
+  subtotalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   shippingAddress: {
     name: string;
     address1: string;
     address2: string | null;
     city: string;
-    province: string;
+    provinceCode: string;
     zip: string;
     country: string;
   } | null;
-  fulfillments: Array<{
-    status: string;
-    trackingCompany: string;
-    trackingInfo: Array<{ number: string; url: string; company: string }>;
-  }>;
+  lineItems: { edges: Array<{ node: GQLLineItem }> };
+  fulfillments: GQLFulfillment[]; // plain array, NOT a paginated connection
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -61,18 +78,26 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 function normalizeOrderNumber(raw: string): string {
-  // Accept "#1001", "1001", "ORD-1001" → strip prefix symbols
   return raw.replace(/^[#\s]+/, "").trim();
 }
 
-// ── GET - not used, but prevents 405 errors ────────────────────────────────
+// ── GET – health / CORS preflight ──────────────────────────────────────────
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
   return jsonResponse({ status: "PostShip Order Lookup API" });
 };
 
-// ── POST - order lookup ────────────────────────────────────────────────────
+// ── POST – order lookup ────────────────────────────────────────────────────
 export const action = async ({ request }: ActionFunctionArgs) => {
-  // OPTIONS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -82,6 +107,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         "Access-Control-Allow-Headers": "Content-Type",
       },
     });
+  }
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
+  if (!shop) {
+    return jsonResponse({ error: "Missing shop parameter." }, 400);
+  }
+  // Auth: pass full request so Shopify can verify the proxy HMAC signature
+  let admin: Awaited<ReturnType<typeof unauthenticated.admin>>["admin"];
+  try {
+    const result = await unauthenticated.admin(shop);
+    admin = result.admin;
+  } catch {
+    return jsonResponse(
+      { error: "Unauthorized — invalid proxy signature." },
+      401,
+    );
   }
 
   // Parse body
@@ -97,29 +138,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse({ error: "Order number and email are required." }, 400);
   }
 
-  // Authenticate via App Proxy (shop comes from query param)
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
-  if (!shop) {
-    return jsonResponse({ error: "Missing shop parameter." }, 400);
-  }
-
-  let admin: Awaited<ReturnType<typeof unauthenticated.admin>>;
-  try {
-    const result = await unauthenticated.admin(shop);
-    admin = result.admin;
-  } catch {
-    return jsonResponse({ error: "Unauthorized." }, 401);
-  }
-
   const normalized = normalizeOrderNumber(order_number);
 
-  // Query by name (order name = "#1001")
-  const queryString = `name:#${normalized}`;
-
+  // ── Corrected GraphQL query ────────────────────────────────────────────────
   const response = await admin.graphql(
-    `
-    #graphql
+    `#graphql
     query lookupOrder($query: String!) {
       orders(first: 5, query: $query) {
         edges {
@@ -132,37 +155,62 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             displayFulfillmentStatus
             displayFinancialStatus
             totalPriceSet {
-              shopMoney { amount currencyCode }
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+            subtotalPriceSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+            shippingAddress {
+              name
+              address1
+              address2
+              city
+              provinceCode
+              zip
+              country
             }
             lineItems(first: 20) {
               edges {
                 node {
                   id
-                  title
+                  name
                   quantity
+                  sku
+                  image {
+                    url
+                  }
+                  originalUnitPriceSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
                   variant {
                     id
                     title
-                    price
-                    image { url }
                   }
                 }
               }
             }
-            shippingAddress {
-              name address1 address2 city province zip country
-            }
-            fulfillments(first: 3) {
-              status
-              trackingCompany
-              trackingInfo { number url company }
+            fulfillments {
+              status              
+              trackingInfo (first:5) {
+                number
+                url
+                company
+              }
             }
           }
         }
       }
-    }
-  `,
-    { variables: { query: queryString } },
+    }`,
+    { variables: { query: `name:#${normalized}` } },
   );
 
   const json = await response.json();
@@ -179,7 +227,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
-  // Find the order matching the email (case-insensitive)
+  // Match by email (case-insensitive)
   const normalizedEmail = email.trim().toLowerCase();
   const order = orders.find((o) => o.email?.toLowerCase() === normalizedEmail);
 
@@ -190,7 +238,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
-  // Shape the response — safe fields only, no PII beyond what was given
+  // ── Shape response for frontend ────────────────────────────────────────────
+  // Shopify returns UPPERCASE enums ("PAID", "UNFULFILLED") — normalize to lowercase
   const currency = order.totalPriceSet.shopMoney.currencyCode;
 
   return jsonResponse({
@@ -200,40 +249,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     cancelled_at: order.cancelledAt,
     fulfillment_status: order.displayFulfillmentStatus.toLowerCase(),
     financial_status: order.displayFinancialStatus.toLowerCase(),
-    total: {
-      amount: order.totalPriceSet.shopMoney.amount,
-      currency,
-    },
-    line_items: order.lineItems.edges.map(({ node: item }) => ({
-      id: item.id,
-      title: item.title,
-      quantity: item.quantity,
-      variant_title:
-        item.variant?.title && item.variant.title !== "Default Title"
-          ? item.variant.title
-          : null,
-      price: item.variant?.price ?? null,
-      currency,
-      image: item.variant?.image?.url ?? null,
+    total_price: order.totalPriceSet.shopMoney.amount,
+    subtotal_price: order.subtotalPriceSet.shopMoney.amount,
+    currency,
+    line_items: order.lineItems.edges.map(({ node }) => ({
+      id: node.id,
+      title: node.name, // name includes variant e.g. "Hoodie - L / Blue"
+      quantity: node.quantity,
+      sku: node.sku ?? null,
+      variant_title: node.variant?.title ?? null,
+      variant_id: node.variant?.id ?? null,
+      price: node.originalUnitPriceSet.shopMoney.amount,
+      image: node.image?.url ?? null,
     })),
     shipping_address: order.shippingAddress
       ? {
           name: order.shippingAddress.name,
           address1: order.shippingAddress.address1,
-          address2: order.shippingAddress.address2,
+          address2: order.shippingAddress.address2 ?? null,
           city: order.shippingAddress.city,
-          province: order.shippingAddress.province,
+          province: order.shippingAddress.provinceCode,
           zip: order.shippingAddress.zip,
           country: order.shippingAddress.country,
         }
       : null,
     fulfillments: order.fulfillments.map((f) => ({
-      status: f.status,
-      tracking_company: f.trackingCompany,
+      status: f.status.toLowerCase(),
+      tracking_company: f.trackingCompany ?? null,
       tracking_info: f.trackingInfo.map((t) => ({
-        number: t.number,
-        url: t.url,
-        company: t.company,
+        number: t.number ?? null,
+        url: t.url ?? null,
+        company: t.company ?? null,
       })),
     })),
   });

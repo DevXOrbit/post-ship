@@ -37,6 +37,13 @@ model Session {
 model AppSettings {
   id                        String   @id @default(cuid())
   shop                      String   @unique
+
+  // ── Subscription plan ────────────────────────────────────────────────────
+  // "free" | "starter" | "pro"
+  // Updated by the Shopify Billing API webhook / callback in Phase 3.
+  // Controls which features are exposed on the storefront via the proxy.
+  plan                      String   @default("free")
+
   cancellationWindowHours   Int      @default(2)
   whatsappNumber            String   @default("")
   reviewRequestDelayDays    Int      @default(7)

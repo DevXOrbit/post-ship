@@ -1,5 +1,7 @@
 /**
  * App Proxy: POST /apps/postship/support-ticket
+ *
+ * FIX: Use unauthenticated.admin(request) for HMAC-verified auth.
  */
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { unauthenticated } from "../shopify.server";
@@ -30,6 +32,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
+  let shop: string;
+  try {
+    await unauthenticated.admin(request);
+    shop = new URL(request.url).searchParams.get("shop") ?? "";
+    if (!shop) throw new Error("missing shop");
+  } catch {
+    return jsonResponse({ error: "Unauthorized." }, 401);
+  }
+
   let body: {
     order_id?: string;
     order_name?: string;
@@ -37,7 +48,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     issue_type?: string;
     description?: string;
   };
-
   try {
     body = await request.json();
   } catch {
@@ -47,16 +57,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { order_id, order_name, email, issue_type, description } = body;
   if (!order_id || !email || !description) {
     return jsonResponse({ error: "Missing required fields." }, 400);
-  }
-
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
-  if (!shop) return jsonResponse({ error: "Missing shop." }, 400);
-
-  try {
-    await unauthenticated.admin(shop);
-  } catch {
-    return jsonResponse({ error: "Unauthorized." }, 401);
   }
 
   await prisma.supportTicket

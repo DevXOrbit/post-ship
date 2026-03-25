@@ -29,6 +29,14 @@ api_version = "2026-04"
   topics = [ "orders/cancelled" ]
   uri = "/webhooks/orders/cancelled"
 
+  [[webhooks.subscriptions]]
+  topics = ["fulfillments/create"]
+  uri    = "/webhooks/fulfillments/create"
+ 
+  [[webhooks.subscriptions]]
+  topics = ["fulfillments/update"]
+  uri    = "/webhooks/fulfillments/update"
+  
 [access_scopes]
 # read_orders + write_orders — required for order tracking, cancel requests
 # read_fulfillments — required for tracking info

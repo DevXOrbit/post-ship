@@ -2,6 +2,17 @@
  * PostShip — Order Tracking Extension
  * Customer-facing JS for the theme app extension block.
  * Communicates with the Shopify App Proxy at /apps/postship
+ *
+ * ── Plan gating ───────────────────────────────────────────────────────────
+ * On init, fetches /apps/postship/config to get the merchant's active plan.
+ * Tabs are shown/hidden based on the plan feature flags:
+ *
+ *   Free    → Cancel tab only
+ *   Starter → Cancel + Returns + Get Help
+ *   Pro     → Cancel + Returns + Get Help
+ *
+ * Block settings (show_cancel, show_returns, show_support) still act as
+ * a secondary toggle — both the plan AND the block setting must be enabled.
  */
 
 (function () {
@@ -14,8 +25,24 @@
   // ── DOM helpers ───────────────────────────────────────────────────────────
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
-  const show = (el) => el && el.removeAttribute("hidden");
-  const hide = (el) => el && el.setAttribute("hidden", "");
+
+  /**
+   * show/hide use BOTH the `hidden` attribute AND the `.ps-hidden` CSS class
+   * so Shopify theme CSS that resets [hidden] { display: block } can't
+   * accidentally make the loading overlay or gated tabs visible.
+   */
+  const show = (el) => {
+    if (!el) return;
+    el.removeAttribute("hidden");
+    el.classList.remove("ps-hidden");
+  };
+
+  const hide = (el) => {
+    if (!el) return;
+    el.setAttribute("hidden", "");
+    el.classList.add("ps-hidden");
+  };
+
   const setText = (el, text) => el && (el.textContent = text);
   const setHTML = (el, html) => el && (el.innerHTML = html);
 
@@ -23,11 +50,26 @@
   let currentOrder = null;
   let currentEmail = "";
 
+  // Populated after /config fetch — fail-open defaults (most restrictive)
+  let planFeatures = { cancel: false, returns: false, support: false };
+
   // ── Init ──────────────────────────────────────────────────────────────────
-  function init() {
+  async function init() {
     const root = $("#postship-tracking");
     if (!root) return;
 
+    // Force-hide loading overlay and result panel immediately
+    hide($("#ps-loading"));
+    hide($("#ps-result"));
+    show($("#ps-lookup"));
+
+    // ── Fetch live plan features from proxy ───────────────────────────────
+    await loadPlanConfig();
+
+    // Apply plan gates BEFORE showing any tabs
+    applyPlanGates();
+
+    // Wire up interactions
     bindLookupForm();
     bindBackButton();
     bindTabs();
@@ -47,6 +89,65 @@
       if (params.get("auto") === "1" && orderParam && emailParam) {
         lookupOrder(orderParam, emailParam);
       }
+    }
+  }
+
+  // ── Fetch plan config ─────────────────────────────────────────────────────
+  async function loadPlanConfig() {
+    try {
+      const res = await fetch(PROXY + "/config", {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return; // fail open
+
+      const data = await res.json();
+
+      if (data.features) {
+        planFeatures = {
+          cancel: !!data.features.cancel,
+          returns: !!data.features.returns,
+          support: !!data.features.support,
+        };
+      }
+
+      // Override block setting values with live DB values if present
+      if (data.cancelWindowHours != null)
+        CFG.cancelWindowHours = data.cancelWindowHours;
+      if (data.whatsappNumber) CFG.whatsappNumber = data.whatsappNumber;
+    } catch {
+      // Network error — fail open, tracking form still works
+    }
+  }
+
+  // ── Apply plan gates ──────────────────────────────────────────────────────
+  // Shows a tab only if BOTH the plan allows it AND the block setting is enabled.
+  function applyPlanGates() {
+    const cancelAllowed = planFeatures.cancel && CFG.showCancel !== false;
+    const returnsAllowed = planFeatures.returns && CFG.showReturns !== false;
+    const supportAllowed = planFeatures.support && CFG.showSupport !== false;
+
+    toggleTab("cancel", cancelAllowed);
+    toggleTab("returns", returnsAllowed);
+    toggleTab("support", supportAllowed);
+
+    // If no action tabs are visible, hide the whole tabs section
+    const tabsContainer = $("#ps-actions-tabs");
+    if (tabsContainer) {
+      cancelAllowed || returnsAllowed || supportAllowed
+        ? show(tabsContainer)
+        : hide(tabsContainer);
+    }
+  }
+
+  function toggleTab(name, visible) {
+    const btn = $(`[data-tab="${name}"]`);
+    const panel = $(`#ps-panel-${name}`);
+    if (visible) {
+      if (btn) show(btn);
+      // Panel visibility is controlled by tab click, not here
+    } else {
+      if (btn) hide(btn);
+      if (panel) hide(panel);
     }
   }
 
@@ -81,7 +182,7 @@
         const data = await res.json().catch(() => ({}));
         throw new Error(
           data.error ||
-            `We couldn't find an order matching those details. Please check your order number and email.`,
+            "We couldn't find an order matching those details. Please check your order number and email.",
         );
       }
 
@@ -119,15 +220,12 @@
 
   // ── Render order ──────────────────────────────────────────────────────────
   function renderOrder(order) {
-    // Switch panels
     hide($("#ps-lookup"));
     show($("#ps-result"));
 
-    // Header
     setText($("#ps-order-name"), order.name);
     setText($("#ps-order-date"), "Placed " + formatDate(order.created_at));
 
-    // Fulfillment badge
     const badge = $("#ps-fulfillment-badge");
     if (badge) {
       badge.textContent = formatStatus(
@@ -137,130 +235,117 @@
         "ps-badge ps-badge--" + statusClass(order.fulfillment_status);
     }
 
-    // Tracking
     const tracking = order.fulfillments?.[0]?.tracking_info?.[0];
     const fulfillmentStatus = order.fulfillments?.[0]?.status;
-    if (tracking?.number) {
-      show($("#ps-tracking-section"));
-      setText(
-        $("#ps-carrier"),
-        order.fulfillments[0].tracking_company || tracking.company || "—",
-      );
+    const trackingSection = $("#ps-tracking-section");
+    if (tracking?.number && trackingSection) {
+      show(trackingSection);
       setText($("#ps-tracking-number"), tracking.number);
-      const link = $("#ps-track-link");
-      if (link && tracking.url) {
-        link.href = tracking.url;
-        show(link);
+      setText(
+        "#ps-carrier-name" in document ? $("#ps-carrier-name") : null,
+        tracking.company || order.fulfillments?.[0]?.tracking_company || "—",
+      );
+      setText(
+        $("#ps-fulfillment-status"),
+        formatStatus(fulfillmentStatus || "in_transit"),
+      );
+      const trackingLink = $("#ps-tracking-link");
+      if (trackingLink && tracking.url) {
+        trackingLink.href = tracking.url;
+        show(trackingLink);
       }
+    } else if (trackingSection) {
+      hide(trackingSection);
     }
 
-    // Line items
-    renderItems(order.line_items || []);
-
-    // Address
-    if (order.shipping_address) {
-      show($("#ps-address-section"));
-      renderAddress(order.shipping_address);
+    const itemsList = $("#ps-items-list");
+    if (itemsList && order.line_items?.length) {
+      setHTML(
+        itemsList,
+        order.line_items
+          .map(
+            (item) => `
+          <div class="ps-item">
+            ${
+              item.image
+                ? `<img class="ps-item__img" src="${escHtml(item.image)}" alt="${escHtml(item.title)}" loading="lazy">`
+                : `<div class="ps-item__img ps-item__img--placeholder"></div>`
+            }
+            <div class="ps-item__info">
+              <span class="ps-item__title">${escHtml(item.title)}</span>
+              ${item.variant_title ? `<span class="ps-item__variant">${escHtml(item.variant_title)}</span>` : ""}
+              <span class="ps-item__qty">Qty: ${item.quantity}</span>
+            </div>
+            <span class="ps-item__price">${formatMoney(item.price, order.currency)}</span>
+          </div>`,
+          )
+          .join(""),
+      );
     }
 
-    // Cancel tab: check if cancellable
-    setupCancelTab(order);
+    const addrSection = $("#ps-address-section");
+    const addrEl = $("#ps-shipping-address");
+    if (addrEl && order.shipping_address) {
+      const a = order.shipping_address;
+      addrEl.textContent = [
+        a.name,
+        a.address1,
+        a.address2,
+        `${a.city} ${a.province} ${a.zip}`,
+        a.country,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      if (addrSection) show(addrSection);
+    }
 
-    // Return items checklist
-    setupReturnItems(order.line_items || []);
-
-    // WhatsApp button
-    setupWhatsApp(order);
-
-    // Reset tabs
-    $$(".ps-tab-panel").forEach(hide);
-    $$(".ps-tab[data-tab]").forEach((t) =>
-      t.setAttribute("aria-selected", "false"),
+    setText(
+      $("#ps-order-total"),
+      order.total_price ? formatMoney(order.total_price, order.currency) : "",
     );
+
+    populateActionForms(order);
+    updateCancelAvailability(order);
+    activateFirstVisibleTab();
   }
 
-  function renderItems(items) {
-    const list = $("#ps-items-list");
-    if (!list) return;
-    list.innerHTML = items
-      .map(
-        (item) => `
-      <div class="ps-item">
-        ${item.image ? `<img class="ps-item__img" src="${escHtml(item.image)}" alt="${escHtml(item.title)}" loading="lazy" />` : '<div class="ps-item__img ps-item__img--placeholder"></div>'}
-        <div class="ps-item__info">
-          <span class="ps-item__title">${escHtml(item.title)}</span>
-          ${item.variant_title ? `<span class="ps-item__variant">${escHtml(item.variant_title)}</span>` : ""}
-          <span class="ps-item__qty">Qty: ${item.quantity}</span>
-        </div>
-        <div class="ps-item__price">${formatMoney(item.price, item.currency)}</div>
-      </div>
-    `,
-      )
-      .join("");
+  function activateFirstVisibleTab() {
+    const firstVisible = $(".ps-tab:not([hidden]):not(.ps-hidden)");
+    if (firstVisible) firstVisible.click();
   }
 
-  function renderAddress(addr) {
-    const el = $("#ps-address");
-    if (!el) return;
-    const parts = [
-      addr.name,
-      addr.address1,
-      addr.address2,
-      [addr.city, addr.province, addr.zip].filter(Boolean).join(", "),
-      addr.country,
-    ].filter(Boolean);
-    el.innerHTML = parts.map((p) => `<span>${escHtml(p)}</span>`).join("");
+  function populateActionForms(order) {
+    const returnItemsWrap = $("#ps-return-items-wrap");
+    if (returnItemsWrap && order.line_items?.length) {
+      setHTML(
+        returnItemsWrap,
+        order.line_items
+          .map(
+            (item) => `
+          <label class="ps-checkbox-label">
+            <input type="checkbox" name="return_items" value="${escHtml(item.id)}" data-title="${escHtml(item.title)}">
+            <span>${escHtml(item.title)}${item.variant_title ? ` — ${escHtml(item.variant_title)}` : ""} (×${item.quantity})</span>
+          </label>`,
+          )
+          .join(""),
+      );
+    }
   }
 
-  function setupCancelTab(order) {
-    const allowed = $("#ps-cancel-allowed");
-    const blocked = $("#ps-cancel-blocked");
-    if (!allowed || !blocked) return;
+  function updateCancelAvailability(order) {
+    const isCancelled = !!order.cancelled_at;
+    const isFulfilled = order.fulfillment_status === "fulfilled";
+    const orderAgeHours =
+      (Date.now() - new Date(order.created_at).getTime()) / 3600000;
+    const withinWindow = orderAgeHours <= (CFG.cancelWindowHours || 2);
 
-    const canCancel = isCancellable(order);
-    if (canCancel) {
-      show(allowed);
-      hide(blocked);
+    if (isCancelled || isFulfilled || !withinWindow) {
+      hide($("#ps-cancel-allowed"));
+      show($("#ps-cancel-blocked"));
     } else {
-      hide(allowed);
-      show(blocked);
+      show($("#ps-cancel-allowed"));
+      hide($("#ps-cancel-blocked"));
     }
-  }
-
-  function isCancellable(order) {
-    if (order.cancelled_at) return false;
-    if (order.fulfillment_status === "fulfilled") return false;
-    const windowHours = CFG.cancelWindowHours || 2;
-    const placed = new Date(order.created_at).getTime();
-    const now = Date.now();
-    const diff = (now - placed) / (1000 * 60 * 60); // hours
-    return diff <= windowHours;
-  }
-
-  function setupReturnItems(items) {
-    const list = $("#ps-return-items-list");
-    if (!list) return;
-    list.innerHTML = items
-      .map(
-        (item, i) => `
-      <label class="ps-checkbox-label">
-        <input type="checkbox" name="return_items" value="${escHtml(item.id || String(i))}" data-title="${escHtml(item.title)}" />
-        <span>${escHtml(item.title)}${item.variant_title ? " — " + escHtml(item.variant_title) : ""}</span>
-        <span class="ps-item__qty">×${item.quantity}</span>
-      </label>
-    `,
-      )
-      .join("");
-  }
-
-  function setupWhatsApp(order) {
-    const btn = $("#ps-whatsapp-btn");
-    if (!btn || !CFG.whatsappNumber) return;
-    const msg = encodeURIComponent(
-      `Hi! I need help with my order ${order.name}. My email is ${currentEmail}.`,
-    );
-    const number = CFG.whatsappNumber.replace(/\D/g, "");
-    btn.href = `https://wa.me/${number}?text=${msg}`;
   }
 
   // ── Back button ───────────────────────────────────────────────────────────
@@ -268,47 +353,58 @@
     const btn = $("#ps-back-btn");
     if (!btn) return;
     btn.addEventListener("click", () => {
+      currentOrder = null;
+      currentEmail = "";
       hide($("#ps-result"));
       show($("#ps-lookup"));
-      currentOrder = null;
+      hideLookupError();
     });
   }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   function bindTabs() {
-    $$(".ps-tab[data-tab]").forEach((tab) => {
-      tab.addEventListener("click", () => {
-        const name = tab.dataset.tab;
-        $$(".ps-tab[data-tab]").forEach((t) =>
-          t.setAttribute("aria-selected", "false"),
-        );
-        tab.setAttribute("aria-selected", "true");
-        $$(".ps-tab-panel").forEach(hide);
-        const panel = $(`#ps-panel-${name}`);
+    const tabBtns = $$(".ps-tab");
+    tabBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.tab;
+        tabBtns.forEach((b) => b.setAttribute("aria-selected", "false"));
+        $$(".ps-tab-panel").forEach((p) => hide(p));
+        btn.setAttribute("aria-selected", "true");
+        const panel = $(`#ps-panel-${target}`);
         if (panel) show(panel);
       });
     });
-
-    // Cancel "other" reason reveal
-    const cancelReason = $("#ps-cancel-reason");
-    if (cancelReason) {
-      cancelReason.addEventListener("change", () => {
-        const wrap = $("#ps-cancel-other-wrap");
-        cancelReason.value === "other" ? show(wrap) : hide(wrap);
-      });
-    }
   }
 
   // ── Cancel form ───────────────────────────────────────────────────────────
   function bindCancelForm() {
     const form = $("#ps-cancel-form");
     if (!form) return;
+
+    const reasonSelect = $("#ps-cancel-reason");
+    if (reasonSelect) {
+      reasonSelect.addEventListener("change", () => {
+        const otherWrap = $("#ps-cancel-other-wrap");
+        if (otherWrap) {
+          reasonSelect.value === "other" ? show(otherWrap) : hide(otherWrap);
+        }
+      });
+    }
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!currentOrder) return;
-      const reason = $("#ps-cancel-reason").value;
-      const notes =
-        ($("#ps-cancel-other") && $("#ps-cancel-other").value) || "";
+      if (!planFeatures.cancel) {
+        showFormMsg(
+          "#ps-cancel-msg",
+          "This feature requires an active PostShip subscription.",
+          "error",
+        );
+        return;
+      }
+
+      const reason = $("#ps-cancel-reason")?.value || "customer";
+      const notes = $("#ps-cancel-other")?.value || "";
 
       setFormLoading(form, true);
       hideFormMsg("#ps-cancel-msg");
@@ -347,6 +443,14 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!currentOrder) return;
+      if (!planFeatures.returns) {
+        showFormMsg(
+          "#ps-return-msg",
+          "Return requests require a Starter plan or above.",
+          "error",
+        );
+        return;
+      }
 
       const checkedItems = $$('input[name="return_items"]:checked', form);
       if (checkedItems.length === 0) {
@@ -362,7 +466,6 @@
         id: cb.value,
         title: cb.dataset.title,
       }));
-
       const returnType =
         $('input[name="return_type"]:checked', form)?.value || "return";
       const reason = $("#ps-return-reason").value;
@@ -407,6 +510,14 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!currentOrder) return;
+      if (!planFeatures.support) {
+        showFormMsg(
+          "#ps-support-msg",
+          "Support tickets require a Starter plan or above.",
+          "error",
+        );
+        return;
+      }
 
       const issueType = $("#ps-issue-type").value;
       const description = $("#ps-issue-desc").value.trim();
@@ -491,16 +602,15 @@
     }
   }
 
-  function formatMoney(cents, currency = "USD") {
+  function formatMoney(amount, currency = "USD") {
     try {
-      const amount =
-        typeof cents === "string" ? parseFloat(cents) : cents / 100;
+      const value = typeof amount === "string" ? parseFloat(amount) : amount;
       return new Intl.NumberFormat(CFG.locale || "en-US", {
         style: "currency",
-        currency,
-      }).format(isNaN(amount) ? 0 : amount);
+        currency: currency || "USD",
+      }).format(isNaN(value) ? 0 : value);
     } catch {
-      return cents;
+      return amount;
     }
   }
 
