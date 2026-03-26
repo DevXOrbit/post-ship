@@ -27,6 +27,7 @@
     el.classList.add("ps-hidden");
   };
   const setText = (el, text) => el && (el.textContent = text);
+  const setLink = (el, url) => el && el.setAttribute("href", url);
   const setHTML = (el, html) => el && (el.innerHTML = html);
 
   let currentOrder = null;
@@ -203,12 +204,15 @@
 
     // Tracking info
     const tracking = order.fulfillments?.[0]?.tracking_info?.[0];
-    console.log(order.fulfillments);
     const trackingSection = $("#ps-tracking-section");
     if (tracking?.number && trackingSection) {
       show(trackingSection);
       setText($("#ps-tracking-number"), tracking.number);
       setText($("#ps-tracking-status"), tracking.status);
+      if (tracking.url) {
+        setLink($("#ps-track-link"), tracking.url);
+        show($("#ps-track-link"));
+      }
       setText(
         $("#ps-carrier-name"),
         tracking.company || order.fulfillments?.[0]?.tracking_company || "—",

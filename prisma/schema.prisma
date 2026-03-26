@@ -71,6 +71,12 @@ model AppSettings {
 
   // ── WhatsApp ──────────────────────────────────────────────────────────────
   whatsappNumber String @default("")   // include country code e.g. +1234567890
+
+  onboardingStep1  Boolean @default(false)
+  onboardingStep2  Boolean @default(false)
+  onboardingStep3  Boolean @default(false)
+  onboardingDone   Boolean @default(false)
+
 }
 
 // ─── PostShip: Return Requests ───────────────────────────────────────────────

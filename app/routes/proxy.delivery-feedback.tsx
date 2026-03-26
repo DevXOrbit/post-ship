@@ -38,8 +38,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   let shop: string;
   try {
-    await unauthenticated.admin(request);
     shop = new URL(request.url).searchParams.get("shop") ?? "";
+    await unauthenticated.admin(shop);
+
     if (!shop) throw new Error("missing shop");
   } catch {
     return jsonResponse({ error: "Unauthorized." }, 401);

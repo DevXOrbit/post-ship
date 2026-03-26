@@ -49,6 +49,13 @@
     "issue_not_delivered": "Package not delivered",
     "issue_other": "Other issue",
     "describe_issue": "Describe the issue",
-    "submit_ticket": "Submit Support Ticket"
+    "submit_ticket": "Submit Support Ticket",
+    "feedback_submit": "Submit Feedback",
+    "whatsapp_button": "Contact via WhatsApp",
+    "feedback_heading": "How was your delivery?",
+    "feedback_subheading": "Your feedback helps us improve.",
+    "feedback_comment_label": "Any comments? (optional)",
+    "feedback_comment_placeholder": "Tell us about your experience...",
+    "feedback_thanks": "Thank you for your feedback!"
   }
 }

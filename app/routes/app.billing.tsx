@@ -88,7 +88,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Sync plan from Shopify (source of truth)
   const currentPlan = await syncPlanFromSubscription(admin, session.shop);
   const activeSub = await getActiveSubscription(admin);
-  console.log(currentPlan);
 
   return {
     currentPlan,
