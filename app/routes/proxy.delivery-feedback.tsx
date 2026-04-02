@@ -1,7 +1,7 @@
 /**
  * app/routes/proxy.delivery-feedback.tsx
  *
- * App Proxy: POST /apps/postship/delivery-feedback
+ * App Proxy: POST /apps/Afyro/delivery-feedback
  *
  * Receives 1–5 star rating + optional comment from the theme extension.
  * Requires Starter plan. One entry per order (duplicate guard).
@@ -100,7 +100,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     })
     .catch((err: Error) => {
-      console.error("[PostShip] Failed to save delivery feedback:", err);
+      console.error("[Afyro] Failed to save delivery feedback:", err);
     });
 
   return jsonResponse({

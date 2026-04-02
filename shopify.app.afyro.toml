@@ -1,14 +1,12 @@
-# shopify.app.toml — Phase 3 update
-# Added: app_subscriptions/update webhook, billing callback redirect URL
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "e823568de22df22b01ece8794d2121a0"
+client_id = "89e78883486102e6bb29e87adb2d0dfe"
 name = "Afyro"
 application_url = "https://example.com"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [app_proxy]
 url      = "https://example.com/proxy"

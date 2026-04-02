@@ -1,7 +1,7 @@
 /**
  * app/lib/email.server.ts
  *
- * Resend email client + branded HTML template builder for PostShip.
+ * Resend email client + branded HTML template builder for Afyro.
  *
  * Templates:
  *   buildTrackingEmail()  — sent when order is shipped
@@ -71,7 +71,7 @@ async function sendViaResend(
   },
 ): Promise<SendResult> {
   if (!apiKey) {
-    console.warn("[PostShip] No Resend API key configured — email skipped.");
+    console.warn("[Afyro] No Resend API key configured — email skipped.");
     return { success: false, error: "No Resend API key configured." };
   }
 
@@ -93,14 +93,14 @@ async function sendViaResend(
 
     if (!res.ok) {
       const errMsg = data.message ?? data.name ?? `Resend error ${res.status}`;
-      console.error("[PostShip] Resend error:", errMsg);
+      console.error("[Afyro] Resend error:", errMsg);
       return { success: false, error: errMsg };
     }
 
     return { success: true, id: data.id };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[PostShip] Resend fetch failed:", msg);
+    console.error("[Afyro] Resend fetch failed:", msg);
     return { success: false, error: msg };
   }
 }
@@ -113,7 +113,7 @@ function trackingPageUrl(
   email: string,
 ): string {
   const name = orderName.replace("#", "");
-  return `https://${shopDomain}/apps/postship?order=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&auto=1`;
+  return `https://${shopDomain}/apps/Afyro?order=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&auto=1`;
 }
 
 function baseTemplate(
@@ -161,7 +161,7 @@ function baseTemplate(
             <td style="padding:16px 32px 28px;border-top:1px solid #f0f0f0;">
               <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
                 You received this email because you placed an order with ${shopName}.<br>
-                Powered by <a href="https://postship.app" style="color:#9ca3af;">PostShip</a>.
+                Powered by <a href="https://Afyro.app" style="color:#9ca3af;">Afyro</a>.
               </p>
             </td>
           </tr>

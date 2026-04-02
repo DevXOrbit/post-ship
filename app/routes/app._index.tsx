@@ -1,12 +1,12 @@
 /**
  * app/routes/app.onboarding.tsx
  *
- * PostShip — Onboarding Page
+ * Afyro — Onboarding Page
  *
  * Three setup steps the merchant must complete before using the app:
- *   Step 1 — Enable the PostShip app embed in the Shopify Theme Editor
+ *   Step 1 — Enable the Afyro app embed in the Shopify Theme Editor
  *   Step 2 — Create a "Track Your Order" page in the Shopify admin
- *   Step 3 — Add the PostShip tracking widget block to that page
+ *   Step 3 — Add the Afyro tracking widget block to that page
  *
  * Step completion is stored in AppSettings (onboardingStep1/2/3).
  * Steps 2 and 3 are manually confirmed by the merchant (button click).
@@ -136,7 +136,7 @@ export default function Index() {
   const allDone = completedCount === 3;
 
   return (
-    <s-page heading={`Welcome to PostShip${shopName ? `, ${shopName}` : ""}!`}>
+    <s-page heading={`Welcome to Afyro${shopName ? `, ${shopName}` : ""}!`}>
       {/* ── Subtitle ──────────────────────────────────────────────────────── */}
       <s-banner tone="info">
         <s-paragraph slot="subtitle">
@@ -147,7 +147,7 @@ export default function Index() {
       {/* ── Progress banner ───────────────────────────────────────────────── */}
       {allDone ? (
         <s-banner tone="success">
-          🎉 All done! PostShip is live on your store. Redirecting you to the
+          🎉 All done! Afyro is live on your store. Redirecting you to the
           dashboard…
         </s-banner>
       ) : (
@@ -164,11 +164,11 @@ export default function Index() {
       {/* ════════════════════════════════════════════════════════════════════
           STEP 1 — Enable App Embed
       ════════════════════════════════════════════════════════════════════ */}
-      <s-section heading="Step 1 — Enable PostShip in Your Theme">
+      <s-section heading="Step 1 — Enable Afyro in Your Theme">
         <s-stack direction="block" gap="base">
           {steps.step1 ? (
             <s-banner tone="success">
-              ✓ App embed is enabled. PostShip is active on your storefront.
+              ✓ App embed is enabled. Afyro is active on your storefront.
             </s-banner>
           ) : (
             <s-banner tone="warning">
@@ -178,9 +178,9 @@ export default function Index() {
           )}
 
           <s-paragraph>
-            PostShip uses a Shopify Theme App Extension. You need to enable it
-            once in the Theme Editor so it can render the tracking widget and
-            the floating &quot;Track My Order&quot; button on your storefront.
+            Afyro uses a Shopify Theme App Extension. You need to enable it once
+            in the Theme Editor so it can render the tracking widget and the
+            floating &quot;Track My Order&quot; button on your storefront.
           </s-paragraph>
 
           <s-stack direction="block" gap="small">
@@ -196,7 +196,7 @@ export default function Index() {
                 at the bottom).
               </s-list-item>
               <s-list-item>
-                Find <s-text type="strong">PostShip</s-text> and toggle it{" "}
+                Find <s-text type="strong">Afyro</s-text> and toggle it{" "}
                 <s-text type="strong">ON</s-text>.
               </s-list-item>
               <s-list-item>
@@ -250,7 +250,7 @@ export default function Index() {
           ) : (
             <s-banner tone="info">
               Your customers need a page to visit when they want to track their
-              order. You&apos;ll add the PostShip widget to this page in Step 3.
+              order. You&apos;ll add the Afyro widget to this page in Step 3.
             </s-banner>
           )}
 
@@ -313,12 +313,12 @@ export default function Index() {
       {/* ════════════════════════════════════════════════════════════════════
           STEP 3 — Add the Widget Block
       ════════════════════════════════════════════════════════════════════ */}
-      <s-section heading="Step 3 — Add the PostShip Widget to Your Page">
+      <s-section heading="Step 3 — Add the Afyro Widget to Your Page">
         <s-stack direction="block" gap="base">
           {steps.step3 ? (
             <s-banner tone="success">
-              ✓ Widget added! The PostShip tracking widget is live on your
-              tracking page. Your customers can now look up their orders.
+              ✓ Widget added! The Afyro tracking widget is live on your tracking
+              page. Your customers can now look up their orders.
             </s-banner>
           ) : (
             <s-banner tone="info">
@@ -330,10 +330,10 @@ export default function Index() {
           <s-paragraph>
             In the Shopify Theme Editor, navigate to the tracking page you just
             created and add the{" "}
-            <s-text type="strong">PostShip — Order Tracking</s-text> block. This
-            is the customer-facing widget where shoppers enter their order
-            number and email to see their order status, tracking info, and take
-            actions like cancelling or requesting a return.
+            <s-text type="strong">Afyro — Order Tracking</s-text> block. This is
+            the customer-facing widget where shoppers enter their order number
+            and email to see their order status, tracking info, and take actions
+            like cancelling or requesting a return.
           </s-paragraph>
 
           <s-stack direction="block" gap="small">
@@ -349,7 +349,7 @@ export default function Index() {
               </s-list-item>
               <s-list-item>
                 Find and select{" "}
-                <s-text type="strong">PostShip — Order Tracking</s-text>.
+                <s-text type="strong">Afyro — Order Tracking</s-text>.
               </s-list-item>
               <s-list-item>
                 Customise the heading, colours, and feature toggles as needed.
@@ -407,7 +407,7 @@ export default function Index() {
           >
             <iframe
               src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title="PostShip Setup Guide"
+              title="Afyro Setup Guide"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               style={{
@@ -444,12 +444,12 @@ export default function Index() {
       <s-section slot="aside" heading="Need help?">
         <s-unordered-list>
           <s-list-item>
-            <s-link href="https://help.postship.app" target="_blank">
+            <s-link href="https://help.Afyro.app" target="_blank">
               Documentation ↗
             </s-link>
           </s-list-item>
           <s-list-item>
-            <s-link href="mailto:support@postship.app">Email support</s-link>
+            <s-link href="mailto:support@Afyro.app">Email support</s-link>
           </s-list-item>
           <s-list-item>
             <s-link href="/app/settings">Configure settings</s-link>

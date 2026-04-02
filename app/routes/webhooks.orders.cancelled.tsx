@@ -19,7 +19,7 @@ interface CancelledOrderPayload {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, payload, topic } = await authenticate.webhook(request);
 
-  console.log(`[PostShip] Webhook received: ${topic} for shop: ${shop}`);
+  console.log(`[Afyro] Webhook received: ${topic} for shop: ${shop}`);
 
   const order = payload as CancelledOrderPayload;
 
@@ -43,10 +43,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     })
     .catch((err: Error) => {
-      console.error(`[PostShip] Failed to update cancellation request:`, err);
+      console.error(`[Afyro] Failed to update cancellation request:`, err);
     });
 
-  console.log(`[PostShip] Order ${order.name} cancelled. DB updated.`);
+  console.log(`[Afyro] Order ${order.name} cancelled. DB updated.`);
 
   return new Response("OK", { status: 200 });
 };

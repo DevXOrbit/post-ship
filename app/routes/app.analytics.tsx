@@ -5,12 +5,12 @@
  *
  * Data sources:
  *  1. Shopify Admin GraphQL — orders revenue, fulfillment rates, last 30 days
- *  2. PostShip DB           — tickets, returns, cancellations, feedback, emails
+ *  2. Afyro DB           — tickets, returns, cancellations, feedback, emails
  *
  * Sections:
  *  A. Revenue Summary        — total revenue, order count, AOV, paid vs pending
  *  B. Fulfillment Health     — fulfilled %, unfulfilled, in-transit counts
- *  C. PostShip Activity      — cancel requests, returns, support tickets, feedback
+ *  C. Afyro Activity      — cancel requests, returns, support tickets, feedback
  *  D. Customer Satisfaction  — average feedback rating, ticket resolution rate
  *  E. Email Performance      — tracking emails sent, review emails sent
  */
@@ -169,7 +169,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderCount > 0 ? Math.round((fulfilledCount / orderCount) * 100) : 0,
   };
 
-  // ── 2. PostShip DB stats ─────────────────────────────────────────────────
+  // ── 2. Afyro DB stats ─────────────────────────────────────────────────
   const sinceDate = since;
 
   const [cancelStats, returnStats, ticketStats, feedbackStats, emailStats] =
@@ -327,7 +327,7 @@ export default function AnalyticsPage() {
             <s-paragraph>
               Upgrade to Pro ($19/mo) to unlock the full analytics dashboard —
               revenue insights, fulfillment health, customer satisfaction
-              scores, and PostShip activity metrics all in one place.
+              scores, and Afyro activity metrics all in one place.
             </s-paragraph>
             <s-stack direction="inline" gap="base">
               <s-button href="/app/billing" tone="success">
@@ -401,8 +401,8 @@ export default function AnalyticsPage() {
         </s-grid>
       </s-section>
 
-      {/* ── C. PostShip Activity ────────────────────────────────────────── */}
-      <s-section heading="PostShip Activity">
+      {/* ── C. Afyro Activity ────────────────────────────────────────── */}
+      <s-section heading="Afyro Activity">
         <s-grid gridTemplateColumns="repeat(12, 1fr)" gap="base">
           {/* Cancel requests */}
           <s-grid-item gridColumn="span 4">
@@ -563,8 +563,8 @@ export default function AnalyticsPage() {
       <s-section slot="aside" heading="About Analytics">
         <s-paragraph>
           All metrics show data from the last 30 days. Revenue data comes
-          directly from your Shopify store. Activity metrics come from
-          PostShip's database.
+          directly from your Shopify store. Activity metrics come from Afyro's
+          database.
         </s-paragraph>
         <s-divider />
         <s-stack direction="block" gap="small">

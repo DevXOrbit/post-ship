@@ -1,5 +1,5 @@
 /**
- * App Proxy: POST /apps/postship/return-request
+ * App Proxy: POST /apps/Afyro/return-request
  */
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { unauthenticated } from "../shopify.server";
@@ -7,17 +7,25 @@ import prisma from "../db.server";
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
   });
 }
 
-export const loader = async (_: LoaderFunctionArgs) => jsonResponse({ status: "ok" });
+export const loader = async (_: LoaderFunctionArgs) =>
+  jsonResponse({ status: "ok" });
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "Content-Type" },
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
     });
   }
 
@@ -37,7 +45,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse({ error: "Invalid request." }, 400);
   }
 
-  const { order_id, order_name, email, return_type, items, reason, notes } = body;
+  const { order_id, order_name, email, return_type, items, reason, notes } =
+    body;
   if (!order_id || !email || !items?.length) {
     return jsonResponse({ error: "Missing required fields." }, 400);
   }
@@ -53,9 +62,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   // Check existing open request
-  const existing = await prisma.returnRequest.findFirst({
-    where: { shop, orderId: order_id, status: "pending" },
-  }).catch(() => null);
+  const existing = await prisma.returnRequest
+    .findFirst({
+      where: { shop, orderId: order_id, status: "pending" },
+    })
+    .catch(() => null);
 
   if (existing) {
     return jsonResponse({
@@ -63,21 +74,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  await prisma.returnRequest.create({
-    data: {
-      shop,
-      orderId: order_id,
-      orderName: order_name || order_id,
-      customerEmail: email,
-      type: return_type || "return",
-      items: JSON.stringify(items),
-      reason: reason || "other",
-      notes: notes || "",
-      status: "pending",
-    },
-  }).catch((err: Error) => {
-    console.error("Failed to save return request:", err);
-  });
+  await prisma.returnRequest
+    .create({
+      data: {
+        shop,
+        orderId: order_id,
+        orderName: order_name || order_id,
+        customerEmail: email,
+        type: return_type || "return",
+        items: JSON.stringify(items),
+        reason: reason || "other",
+        notes: notes || "",
+        status: "pending",
+      },
+    })
+    .catch((err: Error) => {
+      console.error("Failed to save return request:", err);
+    });
 
   const label = return_type === "exchange" ? "exchange" : "return";
   return jsonResponse({

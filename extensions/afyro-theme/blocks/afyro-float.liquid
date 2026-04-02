@@ -1,5 +1,5 @@
 {%- comment -%}
-  PostShip — Floating Tracker Embed Block
+  Afyro — Floating Tracker Embed Block
   Injects a floating "Track my order" button into every page.
   Merchants enable this from Theme Settings → App embeds.
   Target: body (app embed block)
@@ -7,7 +7,7 @@
 
 {%- if block.settings.show_floating_button -%}
 <div
-  id="postship-float"
+  id="Afyro-float"
   class="ps-float"
   style="
     --ps-float-brand: {{ block.settings.float_color }};
@@ -74,7 +74,7 @@
 
 {% schema %}
 {
-  "name": "PostShip Floating Button",
+  "name": "Afyro Floating Button",
   "target": "body",
   "settings": [
     {
@@ -93,7 +93,7 @@
       "type": "url",
       "id": "tracking_page_url",
       "label": "Tracking page URL",
-      "info": "Link to the page where you've added the PostShip tracking block. e.g. /pages/track-your-order"
+      "info": "Link to the page where you've added the Afyro tracking block. e.g. /pages/track-your-order"
     },
     {
       "type": "color",

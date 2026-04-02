@@ -1,7 +1,7 @@
 /**
  * app/routes/proxy.config.tsx
  *
- * App Proxy: GET /apps/postship/config
+ * App Proxy: GET /apps/afyro/config
  * Returns live plan feature flags to the storefront JS.
  *
  * Updated in Phase 2b: added `feedback` feature flag.

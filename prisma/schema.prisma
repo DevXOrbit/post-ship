@@ -33,7 +33,7 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
-// ─── PostShip: App Settings ──────────────────────────────────────────────────
+// ─── Afyro: App Settings ──────────────────────────────────────────────────
 
 model AppSettings {
   id        String   @id @default(cuid())
@@ -79,7 +79,7 @@ model AppSettings {
 
 }
 
-// ─── PostShip: Return Requests ───────────────────────────────────────────────
+// ─── Afyro: Return Requests ───────────────────────────────────────────────
 
 model ReturnRequest {
   id            String    @id @default(cuid())
@@ -99,7 +99,7 @@ model ReturnRequest {
   @@index([orderId])
 }
 
-// ─── PostShip: Cancellation Requests ────────────────────────────────────────
+// ─── Afyro: Cancellation Requests ────────────────────────────────────────
 
 model CancellationRequest {
   id            String    @id @default(cuid())
@@ -118,7 +118,7 @@ model CancellationRequest {
   @@index([orderId])
 }
 
-// ─── PostShip: Support Tickets ───────────────────────────────────────────────
+// ─── Afyro: Support Tickets ───────────────────────────────────────────────
 
 model SupportTicket {
   id            String    @id @default(cuid())
@@ -137,7 +137,7 @@ model SupportTicket {
   @@index([status])
 }
 
-// ─── PostShip: Delivery Feedback ─────────────────────────────────────────────
+// ─── Afyro: Delivery Feedback ─────────────────────────────────────────────
 
 model DeliveryFeedback {
   id            String   @id @default(cuid())
@@ -153,7 +153,7 @@ model DeliveryFeedback {
   @@index([orderId])
 }
 
-// ─── PostShip: Email Log (dedup + audit) ─────────────────────────────────────
+// ─── Afyro: Email Log (dedup + audit) ─────────────────────────────────────
 // Prevents duplicate tracking emails if the webhook fires more than once.
 
 model EmailLog {

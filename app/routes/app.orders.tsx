@@ -209,7 +209,7 @@ export default function Dashboard() {
   } = data;
 
   return (
-    <s-page heading="PostShip — Order Tracking">
+    <s-page heading="Afyro — Order Tracking">
       <s-button
         slot="primary-action"
         icon="refresh"
@@ -431,7 +431,7 @@ export default function Dashboard() {
         </s-table>
       </s-section>
 
-      <s-section slot="aside" heading="PostShip">
+      <s-section slot="aside" heading="Afyro">
         <s-paragraph>
           Manage post-purchase experience — tracking, returns, cancellations,
           and support.

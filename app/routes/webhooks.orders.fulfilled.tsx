@@ -51,15 +51,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   // Guard: feature enabled
   if (!settings.enableTrackingEmails) {
-    console.log(`[PostShip] Tracking emails disabled for ${shop} — skipping.`);
+    console.log(`[Afyro] Tracking emails disabled for ${shop} — skipping.`);
     return new Response("OK", { status: 200 });
   }
 
   // Guard: Resend configured
   if (!settings.resendApiKey || !settings.fromEmail) {
-    console.warn(
-      `[PostShip] Resend not configured for ${shop} — skipping email.`,
-    );
+    console.warn(`[Afyro] Resend not configured for ${shop} — skipping email.`);
     return new Response("OK", { status: 200 });
   }
 
@@ -69,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (!tracking?.tracking_number) {
     console.log(
-      `[PostShip] Order ${order.name} fulfilled with no tracking number — skipping.`,
+      `[Afyro] Order ${order.name} fulfilled with no tracking number — skipping.`,
     );
     return new Response("OK", { status: 200 });
   }
@@ -88,7 +86,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch {
     // Unique constraint violation = already sent
     console.log(
-      `[PostShip] Tracking shipped email already sent for ${order.name} — skipping.`,
+      `[Afyro] Tracking shipped email already sent for ${order.name} — skipping.`,
     );
     return new Response("OK", { status: 200 });
   }
@@ -110,11 +108,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (result.success) {
     console.log(
-      `[PostShip] Tracking email sent for ${order.name} → ${order.email} (id: ${result.id})`,
+      `[Afyro] Tracking email sent for ${order.name} → ${order.email} (id: ${result.id})`,
     );
   } else {
     console.error(
-      `[PostShip] Tracking email FAILED for ${order.name}: ${result.error}`,
+      `[Afyro] Tracking email FAILED for ${order.name}: ${result.error}`,
     );
     // Don't remove the EmailLog entry — retry logic can be added later
   }

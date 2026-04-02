@@ -1,5 +1,5 @@
 /**
- * PostShip — Order Tracking Extension  (Phase 2 complete)
+ * Afyro — Order Tracking Extension  (Phase 2 complete)
  *
  * New in this version:
  *  - WhatsApp contact button (pre-filled with order number)
@@ -10,8 +10,8 @@
 (function () {
   "use strict";
 
-  const CFG = window.__postshipConfig || {};
-  const PROXY = CFG.appProxy || "/apps/postship";
+  const CFG = window.__afyroConfig || {};
+  const PROXY = CFG.appProxy || "/apps/afyro";
 
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
@@ -41,7 +41,7 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
-    const root = $("#postship-tracking");
+    const root = $("#afyro-tracking");
     if (!root) return;
 
     hide($("#ps-loading"));

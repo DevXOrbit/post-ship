@@ -1,5 +1,5 @@
 /**
- * App Proxy: POST /apps/postship/order-lookup
+ * App Proxy: POST /apps/Afyro/order-lookup
  *
  * Validates customer email against order, returns safe order data.
  *
@@ -93,7 +93,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
     });
   }
-  return jsonResponse({ status: "PostShip Order Lookup API" });
+  return jsonResponse({ status: "Afyro Order Lookup API" });
 };
 
 // ── POST – order lookup ────────────────────────────────────────────────────

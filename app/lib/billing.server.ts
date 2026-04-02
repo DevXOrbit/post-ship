@@ -1,7 +1,7 @@
 /**
  * app/lib/billing.server.ts
  *
- * Shopify Billing API helpers for PostShip.
+ * Shopify Billing API helpers for Afyro.
  *
  * Flow:
  *  1. Merchant clicks "Upgrade" on /app/billing
@@ -29,13 +29,13 @@ export const PLANS = {
   },
   starter: {
     id: "starter",
-    name: "PostShip Starter",
+    name: "Afyro Starter",
     price: "9.00",
     trialDays: 7,
   },
   pro: {
     id: "pro",
-    name: "PostShip Pro",
+    name: "Afyro Pro",
     price: "19.00",
     trialDays: 7,
   },

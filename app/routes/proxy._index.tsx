@@ -13,7 +13,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   return new Response(
-    JSON.stringify({ status: "PostShip Proxy OK", version: "1.0.0" }),
+    JSON.stringify({ status: "Afyro Proxy OK", version: "1.0.0" }),
     {
       status: 200,
       headers: {

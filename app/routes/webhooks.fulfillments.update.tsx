@@ -21,7 +21,7 @@ interface FulfillmentUpdatePayload {
   id: number;
   order_id: number;
   status: string;
-  shipment_status: string | null;   // "delivered" | "in_transit" | "out_for_delivery" | null
+  shipment_status: string | null; // "delivered" | "in_transit" | "out_for_delivery" | null
   tracking_company: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
@@ -65,7 +65,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       data: { shop, orderId, type: "tracking_delivered" },
     });
   } catch {
-    console.log(`[PostShip] Delivered email already sent for order ${fulfillment.order_id} — skipping.`);
+    console.log(
+      `[Afyro] Delivered email already sent for order ${fulfillment.order_id} — skipping.`,
+    );
     return new Response("OK", { status: 200 });
   }
 
@@ -76,7 +78,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (!session?.accessToken) {
-    console.error(`[PostShip] No offline session found for ${shop}`);
+    console.error(`[Afyro] No offline session found for ${shop}`);
     return new Response("OK", { status: 200 });
   }
 
@@ -92,9 +94,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           "X-Shopify-Access-Token": session.accessToken,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       order?: {
         name: string;
         email: string;
@@ -105,12 +107,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     orderName = data.order?.name ?? `#${fulfillment.order_id}`;
     customerName = data.order?.shipping_address?.name ?? "";
   } catch (err) {
-    console.error(`[PostShip] Failed to fetch order for delivered email:`, err);
+    console.error(`[Afyro] Failed to fetch order for delivered email:`, err);
     return new Response("OK", { status: 200 });
   }
 
   if (!orderEmail) {
-    console.warn(`[PostShip] No email found for order ${fulfillment.order_id}`);
+    console.warn(`[Afyro] No email found for order ${fulfillment.order_id}`);
     return new Response("OK", { status: 200 });
   }
 
@@ -128,9 +130,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (result.success) {
-    console.log(`[PostShip] Delivered email sent for ${orderName} → ${orderEmail}`);
+    console.log(
+      `[Afyro] Delivered email sent for ${orderName} → ${orderEmail}`,
+    );
   } else {
-    console.error(`[PostShip] Delivered email FAILED for ${orderName}: ${result.error}`);
+    console.error(
+      `[Afyro] Delivered email FAILED for ${orderName}: ${result.error}`,
+    );
   }
 
   // ── Schedule review request ───────────────────────────────────────────────
@@ -155,10 +161,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         update: {}, // don't overwrite if already exists
       })
       .catch((err: Error) => {
-        console.error("[PostShip] Failed to schedule review email:", err);
+        console.error("[Afyro] Failed to schedule review email:", err);
       });
 
-    console.log(`[PostShip] Review email scheduled for ${orderName} after ${sendAfter.toISOString()}`);
+    console.log(
+      `[Afyro] Review email scheduled for ${orderName} after ${sendAfter.toISOString()}`,
+    );
   }
 
   return new Response("OK", { status: 200 });

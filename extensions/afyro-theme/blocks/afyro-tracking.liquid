@@ -1,13 +1,13 @@
 {%- comment -%}
-  PostShip — Order Tracking Block
+  afyro — Order Tracking Block
   Renders the full customer-facing order lookup + tracking experience.
   Target: section (drag & drop in Theme Editor)
 {%- endcomment -%}
 
 <div
-  id="postship-tracking"
-  class="postship-wrap"
-  data-app-proxy="{{ shop.url }}/apps/postship"
+  id="afyro-tracking"
+  class="afyro-wrap"
+  data-app-proxy="{{ shop.url }}/apps/afyro"
   data-locale="{{ request.locale.iso_code }}"
   style="
     --ps-brand: {{ block.settings.brand_color }};
@@ -25,7 +25,7 @@
     <div class="ps-card__header">
       {%- if block.settings.show_icon -%}
         <span class="ps-icon ps-icon--package" aria-hidden="true">
-          {%- render 'postship-icon', icon: 'package' -%}
+          {%- render 'afyro-icon', icon: 'package' -%}
         </span>
       {%- endif -%}
       <h2 class="ps-heading">{{ block.settings.heading | default: 'Track Your Order' }}</h2>
@@ -85,7 +85,7 @@
 
     {%- comment -%} Back button {%- endcomment -%}
     <button id="ps-back-btn" class="ps-btn ps-btn--ghost ps-back-btn" type="button">
-      ← {{ 'postship.back' | t: default: 'Back to lookup' }}
+      ← {{ 'afyro.back' | t: default: 'Back to lookup' }}
     </button>
 
     {%- comment -%} Order header {%- endcomment -%}
@@ -109,34 +109,34 @@
       <svg class="ps-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
       </svg>
-      {{ 'postship.whatsapp_button' | t: default: 'Contact via WhatsApp' }}
+      {{ 'afyro.whatsapp_button' | t: default: 'Contact via WhatsApp' }}
     </a>
   </div>
 {%- endif -%}
     {%- comment -%} Tracking timeline {%- endcomment -%}
     <div id="ps-tracking-section" class="ps-section" hidden>
       <h4 class="ps-section__title">
-        {%- render 'postship-icon', icon: 'truck' -%}
-        {{ 'postship.tracking_info' | t: default: 'Tracking Information' }}
+        {%- render 'afyro-icon', icon: 'truck' -%}
+        {{ 'afyro.tracking_info' | t: default: 'Tracking Information' }}
       </h4>
       <div class="ps-tracking-card">
         <div class="ps-tracking-row">
           <div class="ps-tracking-cell">
-            <span class="ps-label-sm">{{ 'postship.carrier' | t: default: 'Carrier' }}</span>
+            <span class="ps-label-sm">{{ 'afyro.carrier' | t: default: 'Carrier' }}</span>
             <strong id="ps-carrier"></strong>
           </div>
           <div class="ps-tracking-cell">
-            <span class="ps-label-sm">{{ 'postship.tracking_number' | t: default: 'Tracking #' }}</span>
+            <span class="ps-label-sm">{{ 'afyro.tracking_number' | t: default: 'Tracking #' }}</span>
             <strong id="ps-tracking-number"></strong>
           </div>
              <div class="ps-tracking-cell">
-            <span class="ps-label-sm">{{ 'postship.tracking_status' | t: default: 'Tracking Status' }}</span>
+            <span class="ps-label-sm">{{ 'afyro.tracking_status' | t: default: 'Tracking Status' }}</span>
             <strong id="ps-tracking-status"></strong>
           </div>
         </div>
         <a id="ps-track-link" class="ps-btn ps-btn--secondary" target="_blank" rel="noopener" hidden>
-          {%- render 'postship-icon', icon: 'external' -%}
-          {{ 'postship.track_package' | t: default: 'Track Package' }}
+          {%- render 'afyro-icon', icon: 'external' -%}
+          {{ 'afyro.track_package' | t: default: 'Track Package' }}
         </a>
       </div>
     </div>
@@ -144,8 +144,8 @@
     {%- comment -%} Order items {%- endcomment -%}
     <div class="ps-section">
       <h4 class="ps-section__title">
-        {%- render 'postship-icon', icon: 'bag' -%}
-        {{ 'postship.your_items' | t: default: 'Your Items' }}
+        {%- render 'afyro-icon', icon: 'bag' -%}
+        {{ 'afyro.your_items' | t: default: 'Your Items' }}
       </h4>
       <div id="ps-items-list" class="ps-items"></div>
     </div>
@@ -153,8 +153,8 @@
     {%- comment -%} Shipping address {%- endcomment -%}
     <div id="ps-address-section" class="ps-section" hidden>
       <h4 class="ps-section__title">
-        {%- render 'postship-icon', icon: 'pin' -%}
-        {{ 'postship.ship_to' | t: default: 'Shipping To' }}
+        {%- render 'afyro-icon', icon: 'pin' -%}
+        {{ 'afyro.ship_to' | t: default: 'Shipping To' }}
       </h4>
       <address id="ps-address" class="ps-address"></address>
     </div>
@@ -170,8 +170,8 @@
             aria-selected="false"
             id="ps-tab-cancel"
           >
-            {%- render 'postship-icon', icon: 'x-circle' -%}
-            {{ 'postship.cancel_order' | t: default: 'Cancel Order' }}
+            {%- render 'afyro-icon', icon: 'x-circle' -%}
+            {{ 'afyro.cancel_order' | t: default: 'Cancel Order' }}
           </button>
         {%- endif -%}
         {%- if block.settings.show_returns -%}
@@ -182,8 +182,8 @@
             aria-selected="false"
             id="ps-tab-return"
           >
-            {%- render 'postship-icon', icon: 'return' -%}
-            {{ 'postship.return_exchange' | t: default: 'Return / Exchange' }}
+            {%- render 'afyro-icon', icon: 'return' -%}
+            {{ 'afyro.return_exchange' | t: default: 'Return / Exchange' }}
           </button>
         {%- endif -%}
         {%- if block.settings.show_support -%}
@@ -194,8 +194,8 @@
             aria-selected="false"
             id="ps-tab-support"
           >
-            {%- render 'postship-icon', icon: 'help' -%}
-            {{ 'postship.get_help' | t: default: 'Get Help' }}
+            {%- render 'afyro-icon', icon: 'help' -%}
+            {{ 'afyro.get_help' | t: default: 'Get Help' }}
           </button>
         {%- endif -%}
         {%- if block.settings.whatsapp_number != blank -%}
@@ -205,18 +205,18 @@
             target="_blank"
             rel="noopener"
           >
-            {%- render 'postship-icon', icon: 'whatsapp' -%}
-            {{ 'postship.chat_whatsapp' | t: default: 'Chat on WhatsApp' }}
+            {%- render 'afyro-icon', icon: 'whatsapp' -%}
+            {{ 'afyro.chat_whatsapp' | t: default: 'Chat on WhatsApp' }}
           </a>
         {%- endif -%}
       </div>
 <div id="ps-feedback-wrap" class="ps-card ps-feedback-card" hidden>
   <div class="ps-card__header" style="text-align:left;margin-bottom:16px;">
     <h3 class="ps-heading" style="font-size:1.1rem;">
-      {{ 'postship.feedback_heading' | t: default: 'How was your delivery?' }}
+      {{ 'afyro.feedback_heading' | t: default: 'How was your delivery?' }}
     </h3>
     <p class="ps-subheading" style="font-size:0.875rem;">
-      {{ 'postship.feedback_subheading' | t: default: 'Your feedback helps us improve.' }}
+      {{ 'afyro.feedback_subheading' | t: default: 'Your feedback helps us improve.' }}
     </p>
   </div>
 
@@ -236,26 +236,26 @@
       <input type="hidden" id="ps-feedback-rating" name="rating" value="">
       <div class="ps-field">
         <label class="ps-label" for="ps-feedback-comment">
-          {{ 'postship.feedback_comment_label' | t: default: 'Any comments? (optional)' }}
+          {{ 'afyro.feedback_comment_label' | t: default: 'Any comments? (optional)' }}
         </label>
         <textarea
           id="ps-feedback-comment"
           name="comment"
           class="ps-textarea"
           rows="3"
-          placeholder="{{ 'postship.feedback_comment_placeholder' | t: default: 'Tell us about your experience...' }}"
+          placeholder="{{ 'afyro.feedback_comment_placeholder' | t: default: 'Tell us about your experience...' }}"
         ></textarea>
       </div>
       <div id="ps-feedback-msg" class="ps-alert" hidden></div>
       <button class="ps-btn ps-btn--primary" type="submit">
-        {{ 'postship.feedback_submit' | t: default: 'Submit Feedback' }}
+        {{ 'afyro.feedback_submit' | t: default: 'Submit Feedback' }}
       </button> 
     </form>
   </div>
 
   <div id="ps-feedback-thanks" hidden>
     <p class="ps-alert ps-alert--success" style="margin-top:12px;">
-      {{ 'postship.feedback_thanks' | t: default: 'Thank you for your feedback!' }}
+      {{ 'afyro.feedback_thanks' | t: default: 'Thank you for your feedback!' }}
     </p>
   </div>
 </div>
@@ -269,25 +269,25 @@
             <form id="ps-cancel-form" class="ps-form ps-form--compact">
               <div class="ps-field">
                 <label class="ps-label" for="ps-cancel-reason">
-                  {{ 'postship.cancel_reason' | t: default: 'Reason for cancellation' }}
+                  {{ 'afyro.cancel_reason' | t: default: 'Reason for cancellation' }}
                 </label>
                 <select id="ps-cancel-reason" name="reason" class="ps-select">
-                  <option value="customer">{{ 'postship.cancel_reason_customer' | t: default: 'Changed my mind' }}</option>
-                  <option value="duplicate">{{ 'postship.cancel_reason_duplicate' | t: default: 'Ordered by mistake / duplicate' }}</option>
-                  <option value="shipping">{{ 'postship.cancel_reason_shipping' | t: default: 'Shipping time too long' }}</option>
-                  <option value="price">{{ 'postship.cancel_reason_price' | t: default: 'Found a better price' }}</option>
-                  <option value="other">{{ 'postship.cancel_reason_other' | t: default: 'Other' }}</option>
+                  <option value="customer">{{ 'afyro.cancel_reason_customer' | t: default: 'Changed my mind' }}</option>
+                  <option value="duplicate">{{ 'afyro.cancel_reason_duplicate' | t: default: 'Ordered by mistake / duplicate' }}</option>
+                  <option value="shipping">{{ 'afyro.cancel_reason_shipping' | t: default: 'Shipping time too long' }}</option>
+                  <option value="price">{{ 'afyro.cancel_reason_price' | t: default: 'Found a better price' }}</option>
+                  <option value="other">{{ 'afyro.cancel_reason_other' | t: default: 'Other' }}</option>
                 </select>
               </div>
               <div class="ps-field" id="ps-cancel-other-wrap" hidden>
                 <label class="ps-label" for="ps-cancel-other">
-                  {{ 'postship.please_specify' | t: default: 'Please specify' }}
+                  {{ 'afyro.please_specify' | t: default: 'Please specify' }}
                 </label>
                 <textarea id="ps-cancel-other" name="notes" class="ps-textarea" rows="2"></textarea>
               </div>
               <div id="ps-cancel-msg" class="ps-alert" hidden></div>
               <button class="ps-btn ps-btn--danger" type="submit">
-                {{ 'postship.submit_cancel' | t: default: 'Submit Cancellation Request' }}
+                {{ 'afyro.submit_cancel' | t: default: 'Submit Cancellation Request' }}
               </button>
             </form>
           </div>
@@ -306,47 +306,47 @@
           <form id="ps-return-form" class="ps-form ps-form--compact">
             <div class="ps-field">
               <label class="ps-label">
-                {{ 'postship.request_type' | t: default: 'Request type' }}
+                {{ 'afyro.request_type' | t: default: 'Request type' }}
               </label>
               <div class="ps-radio-group">
                 <label class="ps-radio-label">
                   <input type="radio" name="return_type" value="return" checked />
-                  {{ 'postship.return' | t: default: 'Return' }}
+                  {{ 'afyro.return' | t: default: 'Return' }}
                 </label>
                 <label class="ps-radio-label">
                   <input type="radio" name="return_type" value="exchange" />
-                  {{ 'postship.exchange' | t: default: 'Exchange' }}
+                  {{ 'afyro.exchange' | t: default: 'Exchange' }}
                 </label>
               </div>
             </div>
             <div id="ps-return-items" class="ps-field">
               <label class="ps-label">
-                {{ 'postship.select_items' | t: default: 'Select items to return' }}
+                {{ 'afyro.select_items' | t: default: 'Select items to return' }}
               </label>
               <div id="ps-return-items-list" class="ps-items-checklist"></div>
             </div>
             <div class="ps-field">
               <label class="ps-label" for="ps-return-reason">
-                {{ 'postship.return_reason' | t: default: 'Reason' }}
+                {{ 'afyro.return_reason' | t: default: 'Reason' }}
               </label>
               <select id="ps-return-reason" name="reason" class="ps-select">
-                <option value="damaged">{{ 'postship.reason_damaged' | t: default: 'Item arrived damaged' }}</option>
-                <option value="wrong_item">{{ 'postship.reason_wrong' | t: default: 'Wrong item received' }}</option>
-                <option value="not_as_described">{{ 'postship.reason_not_described' | t: default: 'Not as described' }}</option>
-                <option value="no_longer_needed">{{ 'postship.reason_not_needed' | t: default: 'No longer needed' }}</option>
-                <option value="size_fit">{{ 'postship.reason_size' | t: default: 'Wrong size / fit' }}</option>
-                <option value="other">{{ 'postship.reason_other' | t: default: 'Other' }}</option>
+                <option value="damaged">{{ 'afyro.reason_damaged' | t: default: 'Item arrived damaged' }}</option>
+                <option value="wrong_item">{{ 'afyro.reason_wrong' | t: default: 'Wrong item received' }}</option>
+                <option value="not_as_described">{{ 'afyro.reason_not_described' | t: default: 'Not as described' }}</option>
+                <option value="no_longer_needed">{{ 'afyro.reason_not_needed' | t: default: 'No longer needed' }}</option>
+                <option value="size_fit">{{ 'afyro.reason_size' | t: default: 'Wrong size / fit' }}</option>
+                <option value="other">{{ 'afyro.reason_other' | t: default: 'Other' }}</option>
               </select>
             </div>
             <div class="ps-field">
               <label class="ps-label" for="ps-return-notes">
-                {{ 'postship.additional_notes' | t: default: 'Additional notes (optional)' }}
+                {{ 'afyro.additional_notes' | t: default: 'Additional notes (optional)' }}
               </label>
               <textarea id="ps-return-notes" name="notes" class="ps-textarea" rows="3"></textarea>
             </div>
             <div id="ps-return-msg" class="ps-alert" hidden></div>
             <button class="ps-btn ps-btn--primary" type="submit">
-              {{ 'postship.submit_request' | t: default: 'Submit Request' }}
+              {{ 'afyro.submit_request' | t: default: 'Submit Request' }}
             </button>
           </form>
         </div>
@@ -361,19 +361,19 @@
           <form id="ps-support-form" class="ps-form ps-form--compact">
             <div class="ps-field">
               <label class="ps-label" for="ps-issue-type">
-                {{ 'postship.issue_type' | t: default: 'Issue type' }}
+                {{ 'afyro.issue_type' | t: default: 'Issue type' }}
               </label>
               <select id="ps-issue-type" name="issue_type" class="ps-select">
-                <option value="damaged">{{ 'postship.issue_damaged' | t: default: 'Item arrived damaged' }}</option>
-                <option value="missing">{{ 'postship.issue_missing' | t: default: 'Item missing from order' }}</option>
-                <option value="wrong_item">{{ 'postship.issue_wrong' | t: default: 'Wrong item received' }}</option>
-                <option value="not_delivered">{{ 'postship.issue_not_delivered' | t: default: 'Package not delivered' }}</option>
-                <option value="other">{{ 'postship.issue_other' | t: default: 'Other issue' }}</option>
+                <option value="damaged">{{ 'afyro.issue_damaged' | t: default: 'Item arrived damaged' }}</option>
+                <option value="missing">{{ 'afyro.issue_missing' | t: default: 'Item missing from order' }}</option>
+                <option value="wrong_item">{{ 'afyro.issue_wrong' | t: default: 'Wrong item received' }}</option>
+                <option value="not_delivered">{{ 'afyro.issue_not_delivered' | t: default: 'Package not delivered' }}</option>
+                <option value="other">{{ 'afyro.issue_other' | t: default: 'Other issue' }}</option>
               </select>
             </div>
             <div class="ps-field">
               <label class="ps-label" for="ps-issue-desc">
-                {{ 'postship.describe_issue' | t: default: 'Describe the issue' }}
+                {{ 'afyro.describe_issue' | t: default: 'Describe the issue' }}
               </label>
               <textarea
                 id="ps-issue-desc"
@@ -385,7 +385,7 @@
             </div>
             <div id="ps-support-msg" class="ps-alert" hidden></div>
             <button class="ps-btn ps-btn--primary" type="submit">
-              {{ 'postship.submit_ticket' | t: default: 'Submit Support Ticket' }}
+              {{ 'afyro.submit_ticket' | t: default: 'Submit Support Ticket' }}
             </button>
           </form>
         </div>
@@ -397,7 +397,7 @@
   {%- comment -%} ── Loading overlay ─────────────────────────────────────── {%- endcomment -%}
   <div id="ps-loading" class="ps-loading-overlay" hidden aria-live="polite">
     <span class="ps-spinner ps-spinner--lg" role="status">
-      <span class="ps-sr-only">{{ 'postship.loading' | t: default: 'Loading...' }}</span>
+      <span class="ps-sr-only">{{ 'afyro.loading' | t: default: 'Loading...' }}</span>
     </span>
   </div>
 
@@ -405,8 +405,8 @@
 
 {%- comment -%} Pass settings to JS as JSON ─────────────────────────────── {%- endcomment -%}
 <script>
-  window.__postshipConfig = {
-    appProxy: {{ shop.url | append: '/apps/postship' | json }},
+  window.__afyroConfig = {
+    appProxy: {{ shop.url | append: '/apps/afyro' | json }},
     locale: {{ request.locale.iso_code | json }},
     showCancel: {{ block.settings.show_cancel | json }},
     showReturns: {{ block.settings.show_returns | json }},
@@ -415,13 +415,13 @@
     cancelWindowHours: {{ block.settings.cancel_window_hours | json }},
   };
 </script>
-<script src="{{ 'postship-tracking.js' | asset_url }}" defer></script>
+<script src="{{ 'afyro-tracking.js' | asset_url }}" defer></script>
 {% schema %}
 {
-  "name": "PostShip — Order Tracking",
+  "name": "Afyro — Order Tracking",
   "target": "section",
-  "class":"postship-tracking",
-  "stylesheet": "postship-tracking.css",
+  "class":"afyro-tracking",
+  "stylesheet": "afyro-tracking.css",
   "settings": [
     {
   "type": "header",

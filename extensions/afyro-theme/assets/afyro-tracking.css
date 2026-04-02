@@ -1,10 +1,10 @@
 /* ============================================================
-   PostShip — Order Tracking Widget Styles
+   Afyro — Order Tracking Widget Styles
    Uses CSS custom properties set inline from block settings.
    ============================================================ */
 
 /* ── Variables & reset ──────────────────────────────────────── */
-.postship-wrap {
+.afyro-wrap {
   position: relative;
   --ps-brand: #5c6ac4;
   --ps-brand-dark: color-mix(in srgb, var(--ps-brand) 80%, black);
@@ -34,9 +34,9 @@
   padding: 0 16px 32px;
 }
 
-.postship-wrap *,
-.postship-wrap *::before,
-.postship-wrap *::after {
+.afyro-wrap *,
+.afyro-wrap *::before,
+.afyro-wrap *::after {
   box-sizing: inherit;
 }
 
@@ -54,7 +54,7 @@
   .ps-card {
     padding: 20px 16px;
   }
-  .postship-wrap {
+  .afyro-wrap {
     padding: 0 0 24px;
   }
 }
@@ -618,13 +618,13 @@
   border: 0;
 }
 
-.postship-wrap [hidden],
-.postship-wrap .ps-hidden {
+.afyro-wrap [hidden],
+.afyro-wrap .ps-hidden {
   display: none !important;
 }
 
-.postship-wrap #ps-loading[hidden],
-.postship-wrap #ps-loading.ps-hidden {
+.afyro-wrap #ps-loading[hidden],
+.afyro-wrap #ps-loading.ps-hidden {
   display: none !important;
   visibility: hidden;
   pointer-events: none;
@@ -699,6 +699,6 @@
   }
 }
 
-.postship-tracking {
+.afyro-tracking {
   margin: 0 auto;
 }

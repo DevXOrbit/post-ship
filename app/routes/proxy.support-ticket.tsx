@@ -1,5 +1,5 @@
 /**
- * App Proxy: POST /apps/postship/support-ticket
+ * App Proxy: POST /apps/afyro/support-ticket
  *
  * FIX: Use unauthenticated.admin(request) for HMAC-verified auth.
  */

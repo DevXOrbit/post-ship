@@ -1,5 +1,5 @@
 /**
- * App Proxy: POST /apps/postship/cancel-request
+ * App Proxy: POST /apps/afyro/cancel-request
  *
  * FIX: Use unauthenticated.admin(request) — not unauthenticated.admin(shop).
  * The `request` form is required so the helper can verify the proxy HMAC.

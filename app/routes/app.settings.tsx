@@ -1,7 +1,7 @@
 /**
  * app/routes/app.settings.tsx
  *
- * PostShip Settings — fully wired to the DB via getSettings / upsertSettings.
+ * Afyro Settings — fully wired to the DB via getSettings / upsertSettings.
  * All Phase 2 fields are live: Resend API key, from email, coupon config,
  * review delay, brand color, WhatsApp number.
  */
@@ -94,7 +94,7 @@ export default function SettingsPage() {
   const current: AppSettingsData = fetcher.data?.settings ?? settings;
 
   return (
-    <s-page heading="PostShip Settings">
+    <s-page heading="Afyro Settings">
       {saved && (
         <s-banner tone="success">Settings saved successfully!</s-banner>
       )}

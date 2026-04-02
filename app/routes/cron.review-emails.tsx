@@ -43,7 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
   }
 
-  console.log(`[PostShip Cron] Processing ${due.length} review email(s).`);
+  console.log(`[Afyro Cron] Processing ${due.length} review email(s).`);
 
   let sent = 0;
   let failed = 0;
@@ -62,7 +62,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (!settings.resendApiKey || !settings.fromEmail) {
-      console.warn(`[PostShip Cron] Resend not configured for ${schedule.shop} — skipping.`);
+      console.warn(
+        `[Afyro Cron] Resend not configured for ${schedule.shop} — skipping.`,
+      );
       failed++;
       continue;
     }
@@ -110,17 +112,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         where: { id: schedule.id },
         data: { sent: true, sentAt: new Date() },
       });
-      console.log(`[PostShip Cron] Review email sent → ${schedule.customerEmail} (${schedule.orderName})`);
+      console.log(
+        `[Afyro Cron] Review email sent → ${schedule.customerEmail} (${schedule.orderName})`,
+      );
       sent++;
     } else {
-      console.error(`[PostShip Cron] Review email FAILED for ${schedule.orderName}: ${result.error}`);
+      console.error(
+        `[Afyro Cron] Review email FAILED for ${schedule.orderName}: ${result.error}`,
+      );
       failed++;
       // Don't mark as sent — will retry next cron run
     }
   }
 
-  return new Response(
-    JSON.stringify({ processed: due.length, sent, failed }),
-    { headers: { "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ processed: due.length, sent, failed }), {
+    headers: { "Content-Type": "application/json" },
+  });
 };
